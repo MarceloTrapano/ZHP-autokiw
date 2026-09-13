@@ -1,0 +1,385 @@
+import svgwrite
+import tempfile
+from svgwrite.extensions import Inkscape
+from .zhp_color import Zhp_color
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from typing import Optional
+from rembg import remove
+from rembg.sessions.base import BaseSession
+import base64
+import io
+
+
+def _image_href(path) -> str:
+    with Image.open(path) as img:
+        img = img.convert("RGBA")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        data = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{data}"
+
+
+class Assets:
+    BASE_DIR = Path(__file__).resolve().parent.parent / "assets"
+
+    WOSM_LOGO = BASE_DIR / "WOSM_logo.png"
+    WAGGS_LOGO = BASE_DIR / "WAGGS_logo.png"
+    ZHP_LOGO = BASE_DIR / "zhp_logo.png"
+
+    TMP_DIR = Path(tempfile.gettempdir())
+    PROCESSED_IMAGE = TMP_DIR / "stock_processed.jpg"
+    PERSON_MASK = TMP_DIR / "person_mask.png"
+
+
+class AutoKiwBuilder:
+    def __init__(self, session: Optional[BaseSession] = None, canvas_size=1200):
+        if session is None:
+            from rembg import new_session
+            session = new_session()
+        self._session = session
+        self.canvas_size = canvas_size
+        self.main_text = ""
+        self.secondary_text = ""
+        self.logo_path = ""
+        self.author = ""
+        self.output_path = "test.svg"
+        self.color = Zhp_color.green_base
+        self.image_path = None
+        self.use_ai_cutout = False
+        self.padding = 18
+        self.dwg = None
+
+        self.gap = 7
+        self.fontsize = 37
+        self.font_scale_main = 0.73
+        self.text_pad_main = 100
+        self.font_scale_secondary = 0.61
+        self.text_pad_secondary = 140
+        self.font_y_pad = 53
+
+        self.main_text_size = 0
+        self.secondary_text_size = 0
+
+        self.main_box_start = self.canvas_size - (
+            self.main_text_size * self.fontsize * self.font_scale_main + self.text_pad_main
+        )
+        self.secondary_box_start = self.canvas_size - (
+            self.secondary_text_size * self.fontsize * self.font_scale_secondary
+            + self.text_pad_secondary
+        )
+
+    def set_image(self, path: str):
+        self.image_path = path
+        return self
+
+    def set_color(self, color: Zhp_color):
+        self.color = color
+        return self
+
+    def set_main_text(self, text: str):
+        self.main_text = text
+        self.main_text_size = 0
+        for letter in self.main_text:
+            if letter.lower() in [" ", "i", "e", "-"]:
+                self.main_text_size += 0.5
+            else:
+                self.main_text_size += 1
+        self.main_box_start = self.canvas_size - (
+            self.main_text_size * self.fontsize * self.font_scale_main + self.text_pad_main
+        )
+        return self
+
+    def set_secondary_text(self, text: str):
+        self.secondary_text = text
+        self.secondary_text_size = 0
+        for letter in self.secondary_text:
+            if letter.lower() in [" ", "i", "e", "-"]:
+                self.secondary_text_size += 0.5
+            else:
+                self.secondary_text_size += 1
+        self.secondary_box_start = self.canvas_size - (
+            self.secondary_text_size * self.fontsize * self.font_scale_secondary
+            + self.text_pad_secondary
+        )
+        return self
+
+    def set_cutout(self, state: bool, padding: int = 18):
+        self.use_ai_cutout = state
+        self.padding = padding
+        return self
+
+    def set_logo_path(self, path: str):
+        self.logo_path = path
+        return self
+
+    def set_author(self, author: str):
+        self.author = author
+        return self
+
+    def _prepare_mask(self):
+        assert self.dwg is not None, "dwg is not defined"
+        self.mask = self.dwg.mask(id="frame_mask")
+        self.mask.add(self.dwg.rect(
+            insert=(0, 0), size=(self.canvas_size, self.canvas_size), fill="white"))
+
+        with Image.open(self.image_path) as img:
+            cropped_img = ImageOps.fit(
+                img, (self.canvas_size, self.canvas_size), centering=(0.5, 0.5))
+            cropped_img.save(Assets.PROCESSED_IMAGE, quality=95)
+
+        if self.use_ai_cutout:
+            boxes = [(0, 108.2 - self.gap, 352.8 +
+                      self.gap, 108.2 + 95.5 + self.gap)]
+            if self.secondary_text:
+                boxes.append(
+                    (
+                        self.secondary_box_start - self.gap,
+                        980 - self.gap,
+                        self.canvas_size,
+                        980 + 80 + self.gap,
+                    )
+                )
+                boxes.append(
+                    (self.main_box_start - self.gap, 901 - self.gap,
+                     self.canvas_size, 901 + 80 + self.gap)
+                )
+            else:
+                boxes.append(
+                    (self.main_box_start - self.gap, 980 - self.gap,
+                     self.canvas_size, 980 + 80 + self.gap)
+                )
+
+            cutout = remove(cropped_img, session=self._session)
+            alpha_channel = cutout.split()[-1]
+
+            filter_size = self.padding * 2 + 1
+            dilated_alpha = alpha_channel.filter(
+                ImageFilter.MaxFilter(filter_size))
+
+            blurred_alpha = dilated_alpha.filter(
+                ImageFilter.GaussianBlur(radius=5))
+            binary_alpha = blurred_alpha.point(lambda p: 255 if p > 200 else 0)
+
+            inverted_mask = ImageOps.invert(binary_alpha)
+
+            if boxes:
+                draw = ImageDraw.Draw(inverted_mask)
+                for box in boxes:
+                    draw.rectangle(box, fill=0)
+
+            inverted_mask.save(Assets.PERSON_MASK)
+
+            self.mask.add(
+                self.dwg.image(
+                    _image_href(Assets.PERSON_MASK),
+                    insert=(0, 0),
+                    size=(self.canvas_size, self.canvas_size),
+                )
+            )
+        if self.secondary_text:
+            self.mask.add(
+                self.dwg.rect(
+                    insert=(self.secondary_box_start -
+                            self.gap, 980 - self.gap),
+                    size=(1200 - self.secondary_box_start +
+                          self.gap, 80 + (self.gap * 2)),
+                    fill="black",
+                )
+            )
+            self.mask.add(
+                self.dwg.rect(
+                    insert=(self.main_box_start - self.gap, 901 - self.gap),
+                    size=(1200 - self.main_box_start +
+                          self.gap, 80 + (self.gap * 2)),
+                    fill="black",
+                )
+            )
+        else:
+            self.mask.add(
+                self.dwg.rect(
+                    insert=(self.main_box_start - self.gap, 980 - self.gap),
+                    size=(1200 - self.main_box_start +
+                          self.gap, 80 + (self.gap * 2)),
+                    fill="black",
+                )
+            )
+        self.dwg.defs.add(self.mask)
+
+    def _add_frame(self,
+                   size=1200,
+                   margin=67,
+                   stroke_width=15,
+                   color="white",
+                   stub_len=25.5,
+                   gap_len=127,
+                   ):
+        y_stub_end = margin + stub_len
+        y_gap_end = y_stub_end + gap_len
+
+        points = [
+            (margin, y_stub_end),
+            (margin, margin),
+            (size - margin, margin),
+            (size - margin, size - margin),
+            (margin, size - margin),
+            (margin, y_gap_end),
+        ]
+
+        return self.dwg.polyline(
+            points=points,
+            stroke=color,
+            stroke_width=stroke_width,
+            fill="none",
+            stroke_linecap="square",
+        )
+
+    def build(self):
+        self.dwg = svgwrite.Drawing(
+            filename=self.output_path, profile="full", size=(self.canvas_size, self.canvas_size)
+        )
+        inkscape = Inkscape(self.dwg)
+        self._prepare_mask()
+
+        image_layer = inkscape.layer(label="Image layer", locked=True)
+        self.dwg.add(image_layer)
+
+        image = self.dwg.image(
+            _image_href(Assets.PROCESSED_IMAGE),
+            insert=(0, 0),
+            size=(self.canvas_size, self.canvas_size),
+        )
+        image_layer.add(image)
+
+        top_layer = inkscape.layer(label="Top layer", locked=True)
+        self.dwg.add(top_layer)
+
+        frame = self._add_frame()
+        frame["mask"] = self.mask.get_funciri()
+        top_layer.add(frame)
+
+        if self.logo_path:
+            rect = self.dwg.rect(
+                insert=(0, 108.2),
+                size=(352.8, 95.5),
+                fill=self.color,
+            )
+            top_layer.add(rect)
+            image = self.dwg.image(
+                _image_href(self.logo_path),
+                insert=(265, 120),
+                size=(80, 80),
+            )
+            top_layer.add(image)
+        else:
+            rect = self.dwg.rect(
+                insert=(0, 108.2),
+                size=(300, 95.5),
+                fill=self.color,
+            )
+            top_layer.add(rect)
+
+        image = self.dwg.image(
+            _image_href(Assets.WAGGS_LOGO),
+            insert=(195, 123),
+            size=(65, 67),
+        )
+        top_layer.add(image)
+        image = self.dwg.image(
+            _image_href(Assets.WOSM_LOGO),
+            insert=(118, 124),
+            size=(65, 65),
+        )
+        top_layer.add(image)
+        image = self.dwg.image(
+            _image_href(Assets.ZHP_LOGO),
+            insert=(33, 124),
+            size=(65, 65),
+        )
+        top_layer.add(image)
+
+        if self.secondary_text:
+            rect = self.dwg.rect(
+                insert=(self.secondary_box_start, 980),
+                size=(1200, 80),
+                fill=self.color,
+            )
+            top_layer.add(rect)
+
+            rect = self.dwg.rect(
+                insert=(self.main_box_start, 901),
+                size=(1200, 80),
+                fill=self.color,
+            )
+            top_layer.add(rect)
+
+            text = self.dwg.text(
+                self.secondary_text.upper(),
+                insert=(1140, 980 + self.font_y_pad),
+                font_family="Museo Sans 100",
+                font_size=self.fontsize,
+                fill="white",
+                text_anchor="end",
+            )
+            top_layer.add(text)
+
+            text = self.dwg.text(
+                self.main_text.upper(),
+                insert=(1140, 901 + self.font_y_pad),
+                font_family="Museo Sans 900",
+                font_size=self.fontsize,
+                fill="white",
+                text_anchor="end",
+            )
+            top_layer.add(text)
+
+        else:
+            rect = self.dwg.rect(
+                insert=(self.main_box_start, 980),
+                size=(1200, 80),
+                fill=self.color,
+            )
+            top_layer.add(rect)
+
+            text = self.dwg.text(
+                self.main_text.upper(),
+                insert=(1140, 980 + self.font_y_pad),
+                font_family="Museo Sans 900",
+                font_size=self.fontsize,
+                fill="white",
+                text_anchor="end",
+            )
+            top_layer.add(text)
+
+        if self.author:
+            x = 38
+            y = 1123
+            text = self.dwg.text(
+                "FOT. " + self.author.upper(),
+                insert=(x, y),
+                font_family="Museo Sans 100",
+                font_size=20,
+                fill="white",
+                opacity=0.8,
+            )
+            text.rotate(-90, center=(x, y))
+
+            top_layer.add(text)
+
+        self.dwg.save()
+
+        return self.dwg.tostring()
+
+
+if __name__ == "__main__":
+    graphic = (
+        AutoKiwBuilder()
+        .set_image("/home/kacper/ZHP-autokiw/assets/stock.jpg")
+        .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
+        .set_color(Zhp_color.blue_dark)
+        .set_main_text("Dzisiaj łowimy ryby")
+        .set_secondary_text("Przy pomocy kulek")
+        .set_cutout(False)
+        .set_author("zhp")
+        .build()
+    )
