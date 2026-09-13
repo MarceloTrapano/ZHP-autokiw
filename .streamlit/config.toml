@@ -1,0 +1,7 @@
+[theme]
+primaryColor = "#afca0b"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#587d18"
+borderColor="#afca0b"
+showWidgetBorder=true
