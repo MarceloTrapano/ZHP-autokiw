@@ -3,8 +3,8 @@ from enum import StrEnum
 from src import Zhp_color
 
 def add_picture():
-    """Pozwala użytkownmikowi wgrać zdjęcie do przerobienia"""
-    pass
+    """Pozwala użytkownikowi wgrać zdjęcie do przerobienia"""
+    st.file_uploader("Wgraj zdjęcie", accept_multiple_files=False, type="image/*", label_visibility="collapsed")
 
 def get_title_and_subtitle() -> list[str, str|None]:
     """Pobranie od użytkownika tytułu zdjęcia oraz opcjonalnie podtytułu"""
@@ -29,8 +29,6 @@ def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = 
     if state_key not in st.session_state:
         st.session_state[state_key] = None
  
-    # Style współdzielone przez wszystkie kafelki: kwadratowy kształt, brak obramowania
-    # przycisku, kursor "pointer", delikatny efekt hover.
     st.markdown(
         """
         <style>
