@@ -1,10 +1,30 @@
 import streamlit as st
+from streamlit_cropper import st_cropper
 from enum import StrEnum
 from src import Zhp_color
+from PIL import Image 
 
-def add_picture():
+def add_picture() -> Image.Image:
     """Pozwala użytkownikowi wgrać zdjęcie do przerobienia"""
-    st.file_uploader("Wgraj zdjęcie", accept_multiple_files=False, type="image/*", label_visibility="collapsed")
+    img_before_cropping = st.file_uploader("Wgraj zdjęcie", accept_multiple_files=False, type=["png", "jpg"], label_visibility="collapsed")
+    return img_before_cropping
+
+
+def crop_picture(img_before_cropping: Image.Image) -> Image.Image|None:
+    """Pozwala użytkownikowi wyciąć kwadratowy fragment wgranego zdjęcia"""
+    if not img_before_cropping:
+        return None
+
+    img = Image.open(img_before_cropping)
+    image_file = st_cropper(img, aspect_ratio=(1,1), box_color="#000000", realtime_update=True)
+
+    st.write("Podgląd")
+    preview = image_file.copy()
+    preview.thumbnail((150, 150))
+    st.image(preview)
+
+    return image_file
+
 
 def get_title_and_subtitle() -> list[str, str|None]:
     """Pobranie od użytkownika tytułu zdjęcia oraz opcjonalnie podtytułu"""
@@ -13,6 +33,7 @@ def get_title_and_subtitle() -> list[str, str|None]:
     if st.checkbox("Dodaj podtytuł"):
         secondary_text = st.text_input("Wpisz podtytuł")
     return [main_text, secondary_text]
+
 
 def add_author() -> str|None:
     """Pobranie od użytkownika imienia i nazwiska autora zdjęcia (opcjonalne)"""
@@ -24,7 +45,7 @@ def add_author() -> str|None:
 
 def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = "color") -> str | None:
     """Umieszczenie na stronie kolorowych kafelków, z których użytkownik może wybrać jeden"""
-    st.text("Aby wybrać kolor, kliknij jeden z poniższych kafelków")
+    st.text("Aby wybrać kolor, kliknij jeden z poniższych kafelków.")
     state_key = f"{key_prefix}_selected"
     if state_key not in st.session_state:
         st.session_state[state_key] = None
@@ -84,6 +105,10 @@ def ask_to_use_ai() -> bool:
     use_cutout = st.checkbox("Użyj SI do wycięcia ramki")
     return use_cutout
 
+
+def start_the_process():
+    pass
+
 def main() -> None:
 
     st.markdown(
@@ -92,18 +117,20 @@ def main() -> None:
     )
 
     st.subheader("1. Wgraj zdjęcie")
-    add_picture()
+    img_before_cropping = add_picture()
 
-    st.subheader("2. Podaj tytuł oraz podtytuł (opcjonalne)")
+    st.subheader("2. Przytnij zdjęcie")
+    image_file = crop_picture(img_before_cropping )
+
+    st.subheader("3. Podaj tytuł oraz podtytuł (opcjonalne)")
     get_title_and_subtitle()
 
-    st.subheader("3. Czy chcesz dodać autora zdjęcia?")
+    st.subheader("4. Czy chcesz dodać autora zdjęcia?")
     add_author()
 
-    st.subheader("4. Wybierz kolor")
+    st.subheader("5. Wybierz kolor")
     selected = choose_color(Zhp_color, columns=6)
- 
-    st.divider()
+
     if selected:
         st.subheader("Wybrany kolor:")
         c1, c2 = st.columns([1, 4])
@@ -115,9 +142,14 @@ def main() -> None:
             )
         with c2:
             st.code(selected)
-
-    st.subheader("5. Czy chcesz wyciąć ramkę?")
+    st.subheader("6. Czy chcesz wyciąć ramkę?")
     ask_to_use_ai()
+
+    st.divider()
+    st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następni kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col3:
+        st.button("OK", on_click=start_the_process)
 
 if __name__ == "__main__":
     main()
