@@ -106,8 +106,15 @@ def ask_to_use_ai() -> bool:
     return use_cutout
 
 
+def check(image_file: Image.Image, main_text: str, color_name: str) -> bool:
+    "Sprawdza, czy użytkownik uzupełnił obowiązkowe pola"
+    if not all([image_file, main_text, color_name]):
+        return False
+    return True
+
 def start_the_process():
     pass
+
 
 def main() -> None:
 
@@ -123,33 +130,41 @@ def main() -> None:
     image_file = crop_picture(img_before_cropping )
 
     st.subheader("3. Podaj tytuł oraz podtytuł (opcjonalne)")
-    get_title_and_subtitle()
+    main_text, secondary_text = get_title_and_subtitle()
 
     st.subheader("4. Czy chcesz dodać autora zdjęcia?")
-    add_author()
+    author = add_author()
 
     st.subheader("5. Wybierz kolor")
-    selected = choose_color(Zhp_color, columns=6)
+    color_name = choose_color(Zhp_color, columns=6)
 
-    if selected:
+    if color_name:
         st.subheader("Wybrany kolor:")
         c1, c2 = st.columns([1, 4])
         with c1:
             st.markdown(
                 f'<div style="width:60px;height:60px;border-radius:8px;'
-                f'background-color:{selected};border:1px solid #ccc;"></div>',
+                f'background-color:{color_name};border:1px solid #ccc;"></div>',
                 unsafe_allow_html=True,
             )
         with c2:
-            st.code(selected)
+            st.code(color_name)
+
     st.subheader("6. Czy chcesz wyciąć ramkę?")
-    ask_to_use_ai()
+    use_cutout = ask_to_use_ai()
 
     st.divider()
-    st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następni kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
+    st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następnie kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
     col1, col2, col3, col4, col5 = st.columns(5)
     with col3:
-        st.button("OK", on_click=start_the_process)
+        ok_button = st.button("OK", type="primary")
+    if ok_button:
+        if not check(image_file, main_text, color_name):
+            st.error("Uzupełnij wszystkie wymagane pola")
+        else:
+            start_the_process()
+
+
 
 if __name__ == "__main__":
     main()
