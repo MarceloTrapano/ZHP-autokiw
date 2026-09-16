@@ -1,7 +1,7 @@
 import svgwrite
 import tempfile
 from svgwrite.extensions import Inkscape
-from .zhp_color import Zhp_color
+from .zhp_color import ZhpColor
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from typing import Optional
@@ -44,7 +44,7 @@ class AutoKiwBuilder:
         self.logo_path = ""
         self.author = ""
         self.output_path = "test.svg"
-        self.color = Zhp_color.green_base
+        self.color = ZhpColor.green_base
         self.image_path = None
         self.use_ai_cutout = False
         self.padding = 18
@@ -73,7 +73,7 @@ class AutoKiwBuilder:
         self.image_path = path
         return self
 
-    def set_color(self, color: Zhp_color):
+    def set_color(self, color: ZhpColor):
         self.color = color
         return self
 
@@ -376,7 +376,7 @@ if __name__ == "__main__":
         AutoKiwBuilder()
         .set_image("/home/kacper/ZHP-autokiw/assets/stock.jpg")
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
-        .set_color(Zhp_color.blue_dark)
+        .set_color(ZhpColor.blue_dark)
         .set_main_text("Dzisiaj łowimy ryby")
         .set_secondary_text("Przy pomocy kulek")
         .set_cutout(False)

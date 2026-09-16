@@ -21,8 +21,8 @@ _SHADE_PL = {
 }
 
 _SPECIAL_PL = {
-    "white": "biały",
-    "black": "czarny",
+    "white": "Biały",
+    "black": "Czarny",
 }
 
 _TRANSLATIONS = {
@@ -83,5 +83,6 @@ class ZhpColor(StrEnum):
     white = "#ffffff"
     black = "#000000"
 
-    def to_str(self) -> str:
-        return _TRANSLATIONS[self.name]
+    @staticmethod
+    def to_str(color) -> str:
+        return _TRANSLATIONS[color]

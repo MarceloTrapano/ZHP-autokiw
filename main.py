@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 from fastapi import File, Form, Response, UploadFile
 import modal
-from src import Zhp_color, AutoKiwBuilder
+from src import ZhpColor, AutoKiwBuilder
 import subprocess
 import tempfile
 from pathlib import Path
@@ -94,7 +94,7 @@ class ZhpGeneratorService:
             tmp_img_path = tmp_img.name
             tmp_files.append(tmp_img_path)
 
-        selected_color = getattr(Zhp_color, color_name, Zhp_color.green_base)
+        selected_color = getattr(ZhpColor, color_name, ZhpColor.green_base)
 
         builder = (
             AutoKiwBuilder(session=self.session)
