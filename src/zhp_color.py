@@ -1,50 +1,87 @@
 from enum import StrEnum
 
+_COLOR_PL = {
+    "green": "Zielony",
+    "yellow": "Żółty",
+    "violet": "Fioletowy",
+    "navy": "Granatowy",
+    "red": "Czerwony",
+    "orange": "Pomarańczowy",
+    "purple": "Purpurowy",
+    "grey": "Szary",
+    "brown": "Brązowy",
+    "blue": "Niebieski",
+    "pink": "Różowy",
+}
 
-class Zhp_color(StrEnum):
-    green_base: str = "#87a428"
-    green_light: str = "#afca0b"
-    green_dark: str = "#587d18"
+_SHADE_PL = {
+    "base": "podstawowy",
+    "light": "jasny",
+    "dark": "ciemny",
+}
 
-    yellow_base: str = "#f8c409"
-    yellow_light: str = "#fbcd44"
-    yellow_dark: str = "#f6a11a"
+_SPECIAL_PL = {
+    "white": "biały",
+    "black": "czarny",
+}
 
-    violet_base: str = "#5d2f88"
-    violet_light: str = "#80539b"
-    violet_dark: str = "#3f1457"
+_TRANSLATIONS = {
+    **{
+        f"{color}_{shade}": f"{color_pl} {shade_pl}"
+        for color, color_pl in _COLOR_PL.items()
+        for shade, shade_pl in _SHADE_PL.items()
+    },
+    **_SPECIAL_PL,
+}
 
-    navy_base: str = "#252e78"
-    navy_light: str = "#194093"
-    navy_dark: str = "#232740"
 
-    red_base: str = "#e30613"
-    red_light: str = "#e94f2d"
-    red_dark: str = "#9b1006"
+class ZhpColor(StrEnum):
+    green_base = "#87a428"
+    green_light = "#afca0b"
+    green_dark = "#587d18"
 
-    orange_base: str = "#ef7d00"
-    orange_light: str = "#f39200"
-    orange_dark: str = "#e15c11"
+    yellow_base = "#f8c409"
+    yellow_light = "#fbcd44"
+    yellow_dark = "#f6a11a"
 
-    purple_base: str = "#8a0e68"
-    purple_light: str = "#ac467d"
-    purple_dark: str = "#660d51"
+    violet_base = "#5d2f88"
+    violet_light = "#80539b"
+    violet_dark = "#3f1457"
 
-    grey_base: str = "#a6adb3"
-    grey_light: str = "#cfd3d7"
-    grey_dark: str = "#717d85"
+    navy_base = "#252e78"
+    navy_light = "#194093"
+    navy_dark = "#232740"
 
-    brown_base: str = "#a3521f"
-    brown_light: str = "#c7833f"
-    brown_dark: str = "#603519"
+    red_base = "#e30613"
+    red_light = "#e94f2d"
+    red_dark = "#9b1006"
 
-    blue_base: str = "#26b4e6"
-    blue_light: str = "#94d3f1"
-    blue_dark: str = "#0083ac"
+    orange_base = "#ef7d00"
+    orange_light = "#f39200"
+    orange_dark = "#e15c11"
 
-    pink_base: str = "#e58795"
-    pink_light: str = "#f4a5b5"
-    pink_dark: str = "#d36a83"
+    purple_base = "#8a0e68"
+    purple_light = "#ac467d"
+    purple_dark = "#660d51"
 
-    white: str = "#ffffff"
-    black: str = "#000000"
+    grey_base = "#a6adb3"
+    grey_light = "#cfd3d7"
+    grey_dark = "#717d85"
+
+    brown_base = "#a3521f"
+    brown_light = "#c7833f"
+    brown_dark = "#603519"
+
+    blue_base = "#26b4e6"
+    blue_light = "#94d3f1"
+    blue_dark = "#0083ac"
+
+    pink_base = "#e58795"
+    pink_light = "#f4a5b5"
+    pink_dark = "#d36a83"
+
+    white = "#ffffff"
+    black = "#000000"
+
+    def to_str(self) -> str:
+        return _TRANSLATIONS[self.name]
