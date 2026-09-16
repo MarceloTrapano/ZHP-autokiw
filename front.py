@@ -155,12 +155,16 @@ def main() -> None:
 
     st.divider()
     st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następnie kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col3:
+    _, _, _, col, _, _, _ = st.columns(7)
+    with col:
         ok_button = st.button("OK", type="primary")
     if ok_button:
-        if not check(image_file, main_text, color_name):
-            st.error("Uzupełnij wszystkie wymagane pola")
+        if not image_file:
+            st.error("Zdjęcie nie zostało dodane. Dodaj zdjęcie, upewnij się, że wszystkie wymagane pola są uzupełnione i kliknij przycisk OK jeszcze raz.")
+        elif not main_text:
+            st.error("Pole tytułu nie zostało uzupełnione. Podaj tytuł zdjęcia.")
+        elif not color_name:
+            st.error("Nie został wybrany żaden kolor. Wbierz kolor i kliknij przycisk OK jeszcze raz.")
         else:
             start_the_process()
 
