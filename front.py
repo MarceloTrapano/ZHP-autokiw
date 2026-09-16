@@ -43,7 +43,7 @@ def add_author() -> str|None:
     return author
 
 
-def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = "color") -> str | None:
+def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = "color") -> str|None:
     """Umieszczenie na stronie kolorowych kafelków, z których użytkownik może wybrać jeden"""
     st.text("Aby wybrać kolor, kliknij jeden z poniższych kafelków.")
     state_key = f"{key_prefix}_selected"
@@ -54,9 +54,12 @@ def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = 
         """
         <style>
         div[data-testid="stVerticalBlockBorderWrapper"] button {
+            width: 100%;
             aspect-ratio: 1 / 1;
             border: 2px solid rgba(0,0,0,0.15);
-            border-radius: 5px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
             transition: transform 0.08s ease-in-out;
         }
         div[data-testid="stVerticalBlockBorderWrapper"] button:hover {
@@ -79,7 +82,7 @@ def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = 
         for col, color in zip(cols, row):
             with col:
                 tile_key = f"{key_prefix}_tile_{color.name}"
-                is_selected = st.session_state[state_key] == color.value
+                is_selected = st.session_state[state_key] == color.name
                 border = "4px solid #1a1a1a" if is_selected else "2px solid rgba(0,0,0,0.15)"
                 with st.container(key=tile_key):
                     st.markdown(
@@ -94,7 +97,7 @@ def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = 
                         unsafe_allow_html=True,
                     )
                     if st.button(" ", key=f"{tile_key}_btn", use_container_width=True):
-                        st.session_state[state_key] = color.value
+                        st.session_state[state_key] = color.name
                         st.rerun()
  
     return st.session_state[state_key]
@@ -136,19 +139,23 @@ def main() -> None:
     author = add_author()
 
     st.subheader("5. Wybierz kolor")
-    color_name = choose_color(Zhp_color, columns=6)
+    selected_color = choose_color(Zhp_color, columns=6)
 
-    if color_name:
+    if selected_color:
+        selected_hex = Zhp_color[selected_color].value
         st.subheader("Wybrany kolor:")
         c1, c2 = st.columns([1, 4])
         with c1:
             st.markdown(
                 f'<div style="width:60px;height:60px;border-radius:8px;'
-                f'background-color:{color_name};border:1px solid #ccc;"></div>',
+                f'background-color:{selected_hex};border:1px solid #ccc;"></div>',
                 unsafe_allow_html=True,
             )
         with c2:
-            st.code(color_name)
+            st.markdown(
+                f'<i style="color:grey;">{selected_color}</i>',
+                unsafe_allow_html=True,
+            )
 
     st.subheader("6. Czy chcesz wyciąć ramkę?")
     use_cutout = ask_to_use_ai()
@@ -163,7 +170,7 @@ def main() -> None:
             st.error("Zdjęcie nie zostało dodane. Dodaj zdjęcie, upewnij się, że wszystkie wymagane pola są uzupełnione i kliknij przycisk OK jeszcze raz.")
         elif not main_text:
             st.error("Pole tytułu nie zostało uzupełnione. Podaj tytuł zdjęcia.")
-        elif not color_name:
+        elif not selected_color:
             st.error("Nie został wybrany żaden kolor. Wbierz kolor i kliknij przycisk OK jeszcze raz.")
         else:
             start_the_process()
