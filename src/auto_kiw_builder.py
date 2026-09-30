@@ -1,7 +1,7 @@
 import svgwrite
 import tempfile
 from svgwrite.extensions import Inkscape
-from .zhp_color import ZhpColor
+from zhp_color import ZhpColor
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from typing import Optional
@@ -9,6 +9,29 @@ from rembg import remove
 from rembg.sessions.base import BaseSession
 import base64
 import io
+import subprocess
+
+
+def svg_to_jpg(svg_path: str, jpg_path: str, size: int = (1200, 1200), quality: int = 90, background=(255, 255, 255)):
+    png_path = str(Path(jpg_path).with_suffix(".png"))
+
+    subprocess.run(
+        [
+            "inkscape",
+            svg_path,
+            "--export-type=png",
+            f"--export-filename={png_path}",
+            "-w", str(size[0]),
+            "-h", str(size[1]),
+        ],
+        check=True,
+    )
+
+    with Image.open(png_path) as img:
+        img = img.convert("RGBA")
+        flattened = Image.new("RGB", img.size, background)
+        flattened.paste(img, mask=img.split()[-1])
+        flattened.save(jpg_path, format="JPEG", quality=quality, optimize=True)
 
 
 def _image_href(path) -> str:
@@ -33,7 +56,7 @@ class Assets:
 
 
 class AutoKiwBuilder:
-    def __init__(self, session: Optional[BaseSession] = None, canvas_size=1200):
+    def __init__(self, session: Optional[BaseSession] = None, canvas_size: tuple[int, int] = (1200, 1200)):
         if session is None:
             from rembg import new_session
             session = new_session()
@@ -47,9 +70,9 @@ class AutoKiwBuilder:
         self.color = ZhpColor.green_base
         self.image_path = None
         self.use_ai_cutout = False
-        self.padding = 18
         self.dwg = None
 
+        self.padding = 18
         self.gap = 7
         self.fontsize = 37
         self.font_scale_main = 0.73
@@ -61,10 +84,11 @@ class AutoKiwBuilder:
         self.main_text_size = 0
         self.secondary_text_size = 0
 
-        self.main_box_start = self.canvas_size - (
+        self.main_box_start = self.canvas_size[0] - (
             self.main_text_size * self.fontsize * self.font_scale_main + self.text_pad_main
         )
-        self.secondary_box_start = self.canvas_size - (
+
+        self.secondary_box_start = self.canvas_size[0] - (
             self.secondary_text_size * self.fontsize * self.font_scale_secondary
             + self.text_pad_secondary
         )
@@ -73,7 +97,15 @@ class AutoKiwBuilder:
         self.image_path = path
         return self
 
-    def set_color(self, color: ZhpColor):
+    def set_image_shape(self, shape: tuple[int, int]):
+        if len(shape) != 2:
+            raise ValueError("Invalid shape. Expected a tuple of 2 elements.")
+
+        self.canvas_size = shape
+
+        return self
+
+    def set_color(self, color: ZhpColor | str):
         self.color = color
         return self
 
@@ -85,7 +117,7 @@ class AutoKiwBuilder:
                 self.main_text_size += 0.5
             else:
                 self.main_text_size += 1
-        self.main_box_start = self.canvas_size - (
+        self.main_box_start = self.canvas_size[0] - (
             self.main_text_size * self.fontsize * self.font_scale_main + self.text_pad_main
         )
         return self
@@ -98,7 +130,7 @@ class AutoKiwBuilder:
                 self.secondary_text_size += 0.5
             else:
                 self.secondary_text_size += 1
-        self.secondary_box_start = self.canvas_size - (
+        self.secondary_box_start = self.canvas_size[0] - (
             self.secondary_text_size * self.fontsize * self.font_scale_secondary
             + self.text_pad_secondary
         )
@@ -121,11 +153,11 @@ class AutoKiwBuilder:
         assert self.dwg is not None, "dwg is not defined"
         self.mask = self.dwg.mask(id="frame_mask")
         self.mask.add(self.dwg.rect(
-            insert=(0, 0), size=(self.canvas_size, self.canvas_size), fill="white"))
+            insert=(0, 0), size=self.canvas_size, fill="white"))
 
         with Image.open(self.image_path) as img:
             cropped_img = ImageOps.fit(
-                img, (self.canvas_size, self.canvas_size), centering=(0.5, 0.5))
+                img, self.canvas_size, centering=(0.5, 0.5))
             cropped_img.save(Assets.PROCESSED_IMAGE, quality=95)
 
         if self.use_ai_cutout:
@@ -135,19 +167,19 @@ class AutoKiwBuilder:
                 boxes.append(
                     (
                         self.secondary_box_start - self.gap,
-                        980 - self.gap,
-                        self.canvas_size,
-                        980 + 80 + self.gap,
+                        self.canvas_size[1] - 220 - self.gap,
+                        self.canvas_size[0],
+                        self.canvas_size[1] - 220 + 80 + self.gap,
                     )
                 )
                 boxes.append(
-                    (self.main_box_start - self.gap, 901 - self.gap,
-                     self.canvas_size, 901 + 80 + self.gap)
+                    (self.main_box_start - self.gap, self.canvas_size[1] - 299 - self.gap,
+                     self.canvas_size[0], self.canvas_size[1] - 299 + 80 + self.gap)
                 )
             else:
                 boxes.append(
-                    (self.main_box_start - self.gap, 980 - self.gap,
-                     self.canvas_size, 980 + 80 + self.gap)
+                    (self.main_box_start - self.gap, self.canvas_size[1] - 220 - self.gap,
+                     self.canvas_size[0], self.canvas_size[1] - 220 + 80 + self.gap)
                 )
 
             cutout = remove(cropped_img, session=self._session)
@@ -174,23 +206,24 @@ class AutoKiwBuilder:
                 self.dwg.image(
                     _image_href(Assets.PERSON_MASK),
                     insert=(0, 0),
-                    size=(self.canvas_size, self.canvas_size),
+                    size=self.canvas_size,
                 )
             )
         if self.secondary_text:
             self.mask.add(
                 self.dwg.rect(
                     insert=(self.secondary_box_start -
-                            self.gap, 980 - self.gap),
-                    size=(1200 - self.secondary_box_start +
+                            self.gap, self.canvas_size[1] - 220 - self.gap),
+                    size=(self.canvas_size[0] - self.secondary_box_start +
                           self.gap, 80 + (self.gap * 2)),
                     fill="black",
                 )
             )
             self.mask.add(
                 self.dwg.rect(
-                    insert=(self.main_box_start - self.gap, 901 - self.gap),
-                    size=(1200 - self.main_box_start +
+                    insert=(self.main_box_start - self.gap,
+                            self.canvas_size[1] - 299 - self.gap),
+                    size=(self.canvas_size[0] - self.main_box_start +
                           self.gap, 80 + (self.gap * 2)),
                     fill="black",
                 )
@@ -198,8 +231,9 @@ class AutoKiwBuilder:
         else:
             self.mask.add(
                 self.dwg.rect(
-                    insert=(self.main_box_start - self.gap, 980 - self.gap),
-                    size=(1200 - self.main_box_start +
+                    insert=(self.main_box_start - self.gap,
+                            self.canvas_size[1] - 220 - self.gap),
+                    size=(self.canvas_size[0] - self.main_box_start +
                           self.gap, 80 + (self.gap * 2)),
                     fill="black",
                 )
@@ -207,7 +241,6 @@ class AutoKiwBuilder:
         self.dwg.defs.add(self.mask)
 
     def _add_frame(self,
-                   size=1200,
                    margin=67,
                    stroke_width=15,
                    color="white",
@@ -220,9 +253,9 @@ class AutoKiwBuilder:
         points = [
             (margin, y_stub_end),
             (margin, margin),
-            (size - margin, margin),
-            (size - margin, size - margin),
-            (margin, size - margin),
+            (self.canvas_size[0] - margin, margin),
+            (self.canvas_size[0] - margin, self.canvas_size[1] - margin),
+            (margin, self.canvas_size[1] - margin),
             (margin, y_gap_end),
         ]
 
@@ -235,8 +268,11 @@ class AutoKiwBuilder:
         )
 
     def build(self):
+        self.set_main_text(self.main_text)
+        if self.secondary_text:
+            self.set_secondary_text(self.secondary_text)
         self.dwg = svgwrite.Drawing(
-            filename=self.output_path, profile="full", size=(self.canvas_size, self.canvas_size)
+            filename=self.output_path, profile="full", size=self.canvas_size
         )
         inkscape = Inkscape(self.dwg)
         self._prepare_mask()
@@ -247,7 +283,7 @@ class AutoKiwBuilder:
         image = self.dwg.image(
             _image_href(Assets.PROCESSED_IMAGE),
             insert=(0, 0),
-            size=(self.canvas_size, self.canvas_size),
+            size=self.canvas_size,
         )
         image_layer.add(image)
 
@@ -281,8 +317,8 @@ class AutoKiwBuilder:
 
         image = self.dwg.image(
             _image_href(Assets.WAGGS_LOGO),
-            insert=(195, 123),
-            size=(65, 67),
+            insert=(202, 123),
+            size=(50, 67),
         )
         top_layer.add(image)
         image = self.dwg.image(
@@ -300,22 +336,23 @@ class AutoKiwBuilder:
 
         if self.secondary_text:
             rect = self.dwg.rect(
-                insert=(self.secondary_box_start, 980),
-                size=(1200, 80),
+                insert=(self.secondary_box_start, self.canvas_size[1] - 220),
+                size=(self.canvas_size[0], 80),
                 fill=self.color,
             )
             top_layer.add(rect)
 
             rect = self.dwg.rect(
-                insert=(self.main_box_start, 901),
-                size=(1200, 80),
+                insert=(self.main_box_start, self.canvas_size[1] - 299),
+                size=(self.canvas_size[0], 80),
                 fill=self.color,
             )
             top_layer.add(rect)
 
             text = self.dwg.text(
                 self.secondary_text.upper(),
-                insert=(1140, 980 + self.font_y_pad),
+                insert=(
+                    self.canvas_size[0] - 60, self.canvas_size[1] - 220 + self.font_y_pad),
                 font_family="Museo Sans 100",
                 font_size=self.fontsize,
                 fill="white",
@@ -325,7 +362,8 @@ class AutoKiwBuilder:
 
             text = self.dwg.text(
                 self.main_text.upper(),
-                insert=(1140, 901 + self.font_y_pad),
+                insert=(
+                    self.canvas_size[0] - 60, self.canvas_size[1] - 299 + self.font_y_pad),
                 font_family="Museo Sans 900",
                 font_size=self.fontsize,
                 fill="white",
@@ -335,7 +373,7 @@ class AutoKiwBuilder:
 
         else:
             rect = self.dwg.rect(
-                insert=(self.main_box_start, 980),
+                insert=(self.main_box_start, self.canvas_size[1] - 220),
                 size=(1200, 80),
                 fill=self.color,
             )
@@ -343,7 +381,8 @@ class AutoKiwBuilder:
 
             text = self.dwg.text(
                 self.main_text.upper(),
-                insert=(1140, 980 + self.font_y_pad),
+                insert=(
+                    self.canvas_size[0] - 60, self.canvas_size[1] - 220 + self.font_y_pad),
                 font_family="Museo Sans 900",
                 font_size=self.fontsize,
                 fill="white",
@@ -353,7 +392,7 @@ class AutoKiwBuilder:
 
         if self.author:
             x = 38
-            y = 1123
+            y = self.canvas_size[1] - 77
             text = self.dwg.text(
                 "FOT. " + self.author.upper(),
                 insert=(x, y),
@@ -375,11 +414,13 @@ if __name__ == "__main__":
     graphic = (
         AutoKiwBuilder()
         .set_image("/home/kacper/ZHP-autokiw/assets/stock.jpg")
+        .set_image_shape((1080, 1350))
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
-        .set_color(ZhpColor.blue_dark)
-        .set_main_text("Dzisiaj łowimy ryby")
-        .set_secondary_text("Przy pomocy kulek")
+        .set_color("#d9ff7a")
+        .set_main_text("28 września")
+        .set_secondary_text("AKCJA ZAŁÓŻ Mundur")
         .set_cutout(False)
-        .set_author("zhp")
+        .set_author("Kacper Dąbrowski")
         .build()
     )
+    svg_to_jpg("test.svg", "szrysz.jpg", size=(1080, 1350))
