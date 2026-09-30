@@ -210,7 +210,7 @@ class AutoKiwBuilder:
                      self.canvas_size[0], self.canvas_size[1] - 220 + 80 + self.gap)
                 )
 
-            cutout = remove(cropped_img, session=self._session)
+            cutout = remove(cropped_img, session=self._get_session())
             alpha_channel = cutout.split()[-1]
 
             filter_size = self.padding * 2 + 1
