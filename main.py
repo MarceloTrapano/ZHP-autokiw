@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 
-def svg_to_png(svg_code: str, size: int = 1200) -> bytes:
+def svg_to_png(svg_code: str, size: tuple[int, int] = (1200, 1200)) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         svg_path = Path(tmp) / "out.svg"
         png_path = Path(tmp) / "out.png"
@@ -20,8 +20,8 @@ def svg_to_png(svg_code: str, size: int = 1200) -> bytes:
                 str(svg_path),
                 "--export-type=png",
                 f"--export-filename={png_path}",
-                "-w", str(size),
-                "-h", str(size),
+                "-w", str(size[0]),
+                "-h", str(size[1]),
             ],
             check=True,
             capture_output=True,
@@ -69,10 +69,12 @@ class ZhpGeneratorService:
         from rembg import new_session
         try:
             self.session = new_session(
+                "bria-rmbg",
                 providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
             )
         except Exception as e:
-            self.session = new_session(providers=["CPUExecutionProvider"])
+            self.session = new_session(
+                "bria-rmbg", providers=["CPUExecutionProvider"])
         import onnxruntime as ort
 
     @modal.fastapi_endpoint(method="POST")
@@ -81,48 +83,39 @@ class ZhpGeneratorService:
         image_file: UploadFile = File(...),
         main_text: str = Form(...),
         secondary_text: str = Form(""),
-        color_name: str = Form("green_base"),
+        color_hex: str = Form(ZhpColor.green_base),
         use_cutout: bool = Form(False),
         author: str = Form(""),
-        logo_file: UploadFile = File(None),
+        logo_file: UploadFile | None = File(None),
+        width: int = Form(1200),
+        height: int = Form(1200),
     ):
-        tmp_files = []
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
 
-        img_suffix = Path(image_file.filename).suffix or ".jpg"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=img_suffix) as tmp_img:
-            tmp_img.write(image_file.file.read())
-            tmp_img_path = tmp_img.name
-            tmp_files.append(tmp_img_path)
+            img_path = tmp / \
+                f"input{Path(image_file.filename or '').suffix or '.jpg'}"
+            img_path.write_bytes(image_file.file.read())
 
-        selected_color = getattr(ZhpColor, color_name, ZhpColor.green_base)
+            builder = (
+                AutoKiwBuilder(session=self.session)
+                .set_image(str(img_path))
+                .set_image_shape((width, height))
+                .set_main_text(main_text)
+                .set_secondary_text(secondary_text)
+                .set_color(color_hex)
+                .set_cutout(use_cutout)
+                .set_author(author)
+            )
+            builder.output_path = str(tmp / "out.svg")
 
-        builder = (
-            AutoKiwBuilder(session=self.session)
-            .set_image(tmp_img_path)
-            .set_main_text(main_text)
-            .set_secondary_text(secondary_text)
-            .set_color(selected_color)
-            .set_cutout(use_cutout)
-            .set_author(author)
-        )
+            if logo_file and logo_file.filename:
+                logo_path = tmp / \
+                    f"logo{Path(logo_file.filename).suffix or '.png'}"
+                logo_path.write_bytes(logo_file.file.read())
+                builder.set_logo_path(str(logo_path))
 
-        if hasattr(builder, "set_author"):
-            builder.set_author(author)
-        elif hasattr(builder, "author"):
-            builder.author = author
-
-        if logo_file and logo_file.filename:
-            logo_suffix = Path(logo_file.filename).suffix or ".png"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=logo_suffix) as tmp_logo:
-                tmp_logo.write(logo_file.file.read())
-                tmp_logo_path = tmp_logo.name
-                tmp_files.append(tmp_logo_path)
-                builder.set_logo_path(tmp_logo_path)
-
-        svg_code = builder.build()
-
-        png_bytes = svg_to_png(
-            svg_code
-        )
+            svg_code = builder.build()
+            png_bytes = svg_to_png(svg_code, (width, height))
 
         return Response(content=png_bytes, media_type="image/png")

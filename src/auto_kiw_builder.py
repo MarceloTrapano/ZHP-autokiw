@@ -1,15 +1,19 @@
 import svgwrite
 import tempfile
 from svgwrite.extensions import Inkscape
-from zhp_color import ZhpColor
+from .zhp_color import ZhpColor
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from typing import Optional
-from rembg import remove
-from rembg.sessions.base import BaseSession
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rembg.sessions.base import BaseSession
 import base64
+import os
 import io
 import subprocess
+import shutil
 
 
 def svg_to_jpg(svg_path: str, jpg_path: str, size: int = (1200, 1200), quality: int = 90, background=(255, 255, 255)):
@@ -44,22 +48,18 @@ def _image_href(path) -> str:
 
 
 class Assets:
-    BASE_DIR = Path(__file__).resolve().parent.parent / "assets"
+    BASE_DIR = Path(
+        os.environ.get("AUTOKIW_ASSETS")
+        or Path(__file__).resolve().parent.parent / "assets"
+    )
 
     WOSM_LOGO = BASE_DIR / "WOSM_logo.png"
     WAGGS_LOGO = BASE_DIR / "WAGGS_logo.png"
     ZHP_LOGO = BASE_DIR / "zhp_logo.png"
 
-    TMP_DIR = Path(tempfile.gettempdir())
-    PROCESSED_IMAGE = TMP_DIR / "stock_processed.jpg"
-    PERSON_MASK = TMP_DIR / "person_mask.png"
-
 
 class AutoKiwBuilder:
-    def __init__(self, session: Optional[BaseSession] = None, canvas_size: tuple[int, int] = (1200, 1200)):
-        if session is None:
-            from rembg import new_session
-            session = new_session()
+    def __init__(self, session: Optional["BaseSession"] = None, canvas_size: tuple[int, int] = (1200, 1200)):
         self._session = session
         self.canvas_size = canvas_size
         self.main_text = ""
@@ -71,6 +71,12 @@ class AutoKiwBuilder:
         self.image_path = None
         self.use_ai_cutout = False
         self.dwg = None
+        self.img = None
+
+        self.work_dir = Path(tempfile.mkdtemp(prefix="autokiw_"))
+        self.processed_image = self.work_dir / "processed.jpg"
+        self.person_mask = self.work_dir / "person_mask.png"
+        self.output_path = str(self.work_dir / "out.svg")
 
         self.padding = 18
         self.gap = 7
@@ -93,8 +99,19 @@ class AutoKiwBuilder:
             + self.text_pad_secondary
         )
 
-    def set_image(self, path: str):
+    def _get_session(self):
+        if self._session is None:
+            from rembg import new_session
+            self._session = new_session(
+                "u2netp", providers=["CPUExecutionProvider"])
+        return self._session
+
+    def set_image_path(self, path: str):
         self.image_path = path
+        return self
+
+    def set_image(self, image: Image.Image):
+        self.img = image
         return self
 
     def set_image_shape(self, shape: tuple[int, int]):
@@ -155,12 +172,23 @@ class AutoKiwBuilder:
         self.mask.add(self.dwg.rect(
             insert=(0, 0), size=self.canvas_size, fill="white"))
 
-        with Image.open(self.image_path) as img:
+        if self.img is None:
+            with Image.open(self.image_path) as img:
+                cropped_img = ImageOps.fit(
+                    img, self.canvas_size, centering=(0.5, 0.5))
+                cropped_img.save(self.processed_image, quality=95)
+        else:
             cropped_img = ImageOps.fit(
-                img, self.canvas_size, centering=(0.5, 0.5))
-            cropped_img.save(Assets.PROCESSED_IMAGE, quality=95)
+                self.img, self.canvas_size, centering=(0.5, 0.5))
+            cropped_img.save(self.processed_image, quality=95)
 
         if self.use_ai_cutout:
+            try:
+                from rembg import remove
+            except ImportError as e:
+                raise RuntimeError(
+                    "AI cutout requires rembg"
+                ) from e
             boxes = [(0, 108.2 - self.gap, 352.8 +
                       self.gap, 108.2 + 95.5 + self.gap)]
             if self.secondary_text:
@@ -176,13 +204,13 @@ class AutoKiwBuilder:
                     (self.main_box_start - self.gap, self.canvas_size[1] - 299 - self.gap,
                      self.canvas_size[0], self.canvas_size[1] - 299 + 80 + self.gap)
                 )
-            else:
+            elif self.main_text:
                 boxes.append(
                     (self.main_box_start - self.gap, self.canvas_size[1] - 220 - self.gap,
                      self.canvas_size[0], self.canvas_size[1] - 220 + 80 + self.gap)
                 )
 
-            cutout = remove(cropped_img, session=self._session)
+            cutout = remove(cropped_img, session=self._get_session())
             alpha_channel = cutout.split()[-1]
 
             filter_size = self.padding * 2 + 1
@@ -200,11 +228,11 @@ class AutoKiwBuilder:
                 for box in boxes:
                     draw.rectangle(box, fill=0)
 
-            inverted_mask.save(Assets.PERSON_MASK)
+            inverted_mask.save(self.person_mask)
 
             self.mask.add(
                 self.dwg.image(
-                    _image_href(Assets.PERSON_MASK),
+                    _image_href(self.person_mask),
                     insert=(0, 0),
                     size=self.canvas_size,
                 )
@@ -228,7 +256,7 @@ class AutoKiwBuilder:
                     fill="black",
                 )
             )
-        else:
+        elif self.main_text:
             self.mask.add(
                 self.dwg.rect(
                     insert=(self.main_box_start - self.gap,
@@ -281,7 +309,7 @@ class AutoKiwBuilder:
         self.dwg.add(image_layer)
 
         image = self.dwg.image(
-            _image_href(Assets.PROCESSED_IMAGE),
+            _image_href(self.processed_image),
             insert=(0, 0),
             size=self.canvas_size,
         )
@@ -371,10 +399,10 @@ class AutoKiwBuilder:
             )
             top_layer.add(text)
 
-        else:
+        elif self.main_text:
             rect = self.dwg.rect(
                 insert=(self.main_box_start, self.canvas_size[1] - 220),
-                size=(1200, 80),
+                size=(self.canvas_size[0], 80),
                 fill=self.color,
             )
             top_layer.add(rect)
@@ -409,17 +437,20 @@ class AutoKiwBuilder:
 
         return self.dwg.tostring()
 
+    def close(self):
+        shutil.rmtree(self.work_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     graphic = (
         AutoKiwBuilder()
-        .set_image("/home/kacper/ZHP-autokiw/assets/stock.jpg")
+        .set_image("/home/kacper/ZHP-autokiw/assets/target.jpg")
         .set_image_shape((1080, 1350))
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
         .set_color("#d9ff7a")
-        .set_main_text("28 września")
-        .set_secondary_text("AKCJA ZAŁÓŻ Mundur")
-        .set_cutout(False)
+        .set_main_text("")
+        .set_secondary_text("")
+        .set_cutout(True)
         .set_author("Kacper Dąbrowski")
         .build()
     )
