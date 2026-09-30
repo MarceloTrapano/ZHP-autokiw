@@ -7,9 +7,45 @@ import tempfile
 from pathlib import Path
 from src import ZhpColor, AutoKiwBuilder
 from src.auto_kiw_builder import svg_to_jpg
+import subprocess
+import shutil
 import base64
 import io
 import numpy as np
+
+
+@st.cache_resource
+def setup_system_fonts():
+    """Kopiuje czcionki z folderu assets/fonts do systemu i odświeża cache."""
+    fonts_dest_dir = Path.home() / ".fonts"
+
+    fonts_source_dir = Path("assets/fonts")
+
+    fonts_dest_dir.mkdir(parents=True, exist_ok=True)
+
+    if fonts_source_dir.exists():
+        for font_file in fonts_source_dir.iterdir():
+            if font_file.is_file() and font_file.suffix.lower() in ['.ttf', '.otf']:
+                shutil.copy(font_file, fonts_dest_dir)
+    else:
+        st.warning(f"Nie znaleziono folderu: {fonts_source_dir}")
+        return
+
+    try:
+        subprocess.run(
+            ["fc-cache", "-f", "-v"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+    except subprocess.CalledProcessError as e:
+        st.error(f"Błąd podczas odświeżania cache'u czcionek: {e.stderr}")
+    except FileNotFoundError:
+        st.error(
+            "Nie znaleziono komendy 'fc-cache'. Upewnij się, że pakiet 'fontconfig' jest zainstalowany.")
+
+
+setup_system_fonts()
 
 
 @st.cache_data
