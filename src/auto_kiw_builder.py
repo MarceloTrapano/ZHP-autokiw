@@ -5,9 +5,12 @@ from zhp_color import ZhpColor
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from typing import Optional
-from rembg import remove
-from rembg.sessions.base import BaseSession
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rembg.sessions.base import BaseSession
 import base64
+import os
 import io
 import subprocess
 
@@ -44,7 +47,10 @@ def _image_href(path) -> str:
 
 
 class Assets:
-    BASE_DIR = Path(__file__).resolve().parent.parent / "assets"
+    BASE_DIR = Path(
+        os.environ.get("AUTOKIW_ASSETS")
+        or Path(__file__).resolve().parent.parent / "assets"
+    )
 
     WOSM_LOGO = BASE_DIR / "WOSM_logo.png"
     WAGGS_LOGO = BASE_DIR / "WAGGS_logo.png"
@@ -56,10 +62,7 @@ class Assets:
 
 
 class AutoKiwBuilder:
-    def __init__(self, session: Optional[BaseSession] = None, canvas_size: tuple[int, int] = (1200, 1200)):
-        if session is None:
-            from rembg import new_session
-            session = new_session()
+    def __init__(self, session: Optional["BaseSession"] = None, canvas_size: tuple[int, int] = (1200, 1200)):
         self._session = session
         self.canvas_size = canvas_size
         self.main_text = ""
@@ -92,6 +95,12 @@ class AutoKiwBuilder:
             self.secondary_text_size * self.fontsize * self.font_scale_secondary
             + self.text_pad_secondary
         )
+
+    def _get_session(self):
+        if self._session is None:
+            from rembg import new_session
+            self._session = new_session()
+        return self._session
 
     def set_image(self, path: str):
         self.image_path = path
@@ -161,6 +170,12 @@ class AutoKiwBuilder:
             cropped_img.save(Assets.PROCESSED_IMAGE, quality=95)
 
         if self.use_ai_cutout:
+            try:
+                from rembg import remove
+            except ImportError as e:
+                raise RuntimeError(
+                    "AI cutout requires rembg"
+                ) from e
             boxes = [(0, 108.2 - self.gap, 352.8 +
                       self.gap, 108.2 + 95.5 + self.gap)]
             if self.secondary_text:
@@ -417,6 +432,8 @@ if __name__ == "__main__":
         .set_image_shape((1080, 1350))
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
         .set_color("#d9ff7a")
+        .set_main_text("")
+        .set_secondary_text("")
         .set_cutout(False)
         .set_author("Kacper Dąbrowski")
         .build()
