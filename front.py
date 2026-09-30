@@ -7,6 +7,95 @@ import tempfile
 from pathlib import Path
 from src import ZhpColor, AutoKiwBuilder
 from src.auto_kiw_builder import svg_to_jpg
+import base64
+import io
+
+
+@st.cache_data
+def logo_data_uri(path: str, height: int = 160) -> str:
+    """Wczytuje logo, zmniejsza je i zwraca jako data URI do wstawienia w HTML."""
+    with Image.open(path) as img:
+        img = img.convert("RGBA")
+        width = round(img.width * height / img.height)
+        img = img.resize((width, height), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+FOOTER_CSS = f"""
+<style>
+[data-testid="stMain"],
+[data-testid="stMainBlockContainer"],
+.block-container {{
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+}}
+/* pusty kontener na st.chat_input, którego nie używasz */
+[data-testid="stBottom"] {{ display: none; }}
+[data-testid="stAppViewContainer"] {{ overflow-x: hidden; }}
+
+.app-footer {{
+    position: relative;
+    left: 50%;
+    margin-left: -50vw;
+    width: 100vw;
+    box-sizing: border-box;
+    margin-top: 4rem;
+    padding: 32px 32px 36px;
+    background-color: {ZhpColor.green_base};
+    color: #ffffff;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}}
+.footer-inner {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+}}
+.footer-logo {{ height: 80px; width: auto; }}
+.footer-text {{ flex: 1; text-align: center; }}
+.footer-text a {{ color: #ffffff; text-decoration: underline; }}
+.footer-text .small {{ opacity: 0.75; font-size: 0.8rem; }}
+
+/* wąskie ekrany: logotypy w jednym rzędzie, tekst pod spodem */
+@media (max-width: 640px) {{
+    .footer-inner {{ flex-wrap: wrap; }}
+    .footer-logo {{ height: 56px; }}
+    .footer-logo.left {{ order: 1; }}
+    .footer-logo.right {{ order: 2; }}
+    .footer-text {{ order: 3; flex-basis: 100%; }}
+}}
+</style>
+"""
+
+FOOTER_FIXED_CSS = """
+<style>
+.app-footer { position: fixed !important; left: 0 !important;
+              bottom: 0 !important; margin: 0 !important;
+              width: 100vw !important; z-index: 999; }
+</style>
+"""
+
+
+def render_footer(left_logo: str, right_logo: str, fixed: bool = False) -> None:
+    # left = logo_data_uri(left_logo) <img class="footer-logo left" src="{left}" alt="Logo ZHP">
+    right = logo_data_uri(right_logo)
+    html = f"""
+<div class="app-footer"><div class="footer-inner">
+<div class="footer-text">
+<div><strong>Aplikacja do obróbki zdjęć zgodnie z KIW ZHP</strong></div>
+<div>© 2026 Kacper Dąbrowski · <a href="mailto:kontakt@example.com">Kontakt</a></div>
+<div class="small">Zdjęcia nie są zapisywane na serwerze.</div>
+</div>
+<img class="footer-logo right" src="{right}" alt="Logo drużyny">
+</div></div>
+"""
+    css = FOOTER_CSS + (FOOTER_FIXED_CSS if fixed else "")
+    st.markdown(css + html, unsafe_allow_html=True)
 
 
 if "is_running" not in st.session_state:
@@ -27,6 +116,10 @@ def add_picture() -> Image.Image:
 def crop_picture(img_before_cropping):
     if not img_before_cropping:
         return None
+
+    st.markdown("---")
+
+    st.subheader("Przytnij zdjęcie")
 
     img = ImageOps.exif_transpose(Image.open(img_before_cropping))
     image_file = st_cropper(img, aspect_ratio=(1, 1),
@@ -160,78 +253,90 @@ def main() -> None:
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
     )
+    st.markdown("---")
 
-    st.subheader("1. Wgraj zdjęcie")
+    st.subheader("Wgraj zdjęcie")
     img_before_cropping = add_picture()
 
-    st.subheader("2. Przytnij zdjęcie")
-    image_file = crop_picture(img_before_cropping)
+    if img_before_cropping is not None:
+        image_file = crop_picture(img_before_cropping)
 
-    st.subheader("3. Podaj tytuł oraz podtytuł (opcjonalne)")
-    main_text, secondary_text = get_title_and_subtitle()
+        st.markdown("---")
 
-    st.subheader("4. Czy chcesz dodać autora zdjęcia?")
-    author = add_author()
+        st.subheader("Podaj tytuł oraz podtytuł (opcjonalne)")
+        main_text, secondary_text = get_title_and_subtitle()
 
-    st.subheader("5. Wybierz kolor")
-    selected_color = choose_color(ZhpColor, columns=6)
+        st.markdown("---")
 
-    if selected_color:
-        selected_hex = ZhpColor[selected_color].value
-        st.subheader("Wybrany kolor:")
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            st.markdown(
-                f'<div style="width:60px;height:60px;border-radius:8px;'
-                f'background-color:{selected_hex};border:1px solid #ccc;"></div>',
-                unsafe_allow_html=True,
-            )
-        with c2:
-            st.markdown(
-                f'<i style="color:grey;">{selected_color}</i>',
-                unsafe_allow_html=True,
-            )
+        st.subheader("Czy chcesz dodać autora zdjęcia?")
+        author = add_author()
 
-    st.subheader("6. Czy chcesz wyciąć ramkę?")
-    use_cutout = ask_to_use_ai()
+        st.markdown("---")
 
-    st.divider()
-    st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następnie kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
-    _, _, _, col, _, _, _ = st.columns(7)
-    with col:
-        st.button("OK", type="primary",
-                  on_click=lock_button,
-                  disabled=st.session_state.is_running)
+        st.subheader("Wybierz kolor")
+        selected_color = choose_color(ZhpColor, columns=6)
 
-    if st.session_state.is_running:
-        if not check(image_file):
-            st.session_state.error = "Uzupełnij zdjęcie."
-        else:
-            st.session_state.error = None
-            try:
-                with st.spinner("Trwa generowanie, proszę czekać...", show_time=True):
-                    st.session_state.result = start_the_process(
-                        image=image_file,
-                        main_text=main_text,
-                        secondary_text=secondary_text,
-                        author=author,
-                        color=selected_hex,
-                        use_cutout=use_cutout,
-                    )
-            except Exception as e:
-                st.session_state.error = f"Nie udało się wygenerować grafiki: {e}"
-            finally:
-                st.session_state.is_running = False
-        st.session_state.is_running = False
-        st.rerun()
+        if selected_color:
+            selected_hex = ZhpColor[selected_color].value
+            st.subheader("Wybrany kolor:")
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                st.markdown(
+                    f'<div style="width:60px;height:60px;border-radius:8px;'
+                    f'background-color:{selected_hex};border:1px solid #ccc;"></div>',
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                st.markdown(
+                    f'<i style="color:grey;">{selected_color}</i>',
+                    unsafe_allow_html=True,
+                )
 
-    if st.session_state.get("error"):
-        st.warning(st.session_state.error)
+        st.markdown("---")
 
-    if "result" in st.session_state:
-        st.image(st.session_state.result)
-        st.download_button("Pobierz JPG", st.session_state.result,
-                           "grafika.jpg", "image/jpeg")
+        st.subheader("Czy chcesz wyciąć ramkę?")
+        use_cutout = ask_to_use_ai()
+
+        st.divider()
+        st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następnie kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
+        _, _, _, col, _, _, _ = st.columns(7)
+        with col:
+            st.button("OK", type="primary",
+                      on_click=lock_button,
+                      disabled=st.session_state.is_running)
+
+        if st.session_state.is_running:
+            if not check(image_file):
+                st.session_state.error = "Uzupełnij zdjęcie."
+            else:
+                st.session_state.error = None
+                try:
+                    with st.spinner("Trwa generowanie, proszę czekać...", show_time=True):
+                        st.session_state.result = start_the_process(
+                            image=image_file,
+                            main_text=main_text,
+                            secondary_text=secondary_text,
+                            author=author,
+                            color=selected_hex,
+                            use_cutout=use_cutout,
+                        )
+                except Exception as e:
+                    st.session_state.error = f"Nie udało się wygenerować grafiki: {e}"
+                finally:
+                    st.session_state.is_running = False
+            st.session_state.is_running = False
+            st.rerun()
+
+        if st.session_state.get("error"):
+            st.warning(st.session_state.error)
+
+        if "result" in st.session_state:
+            st.image(st.session_state.result)
+            st.download_button("Pobierz JPG", st.session_state.result,
+                               "grafika.jpg", "image/jpeg")
+
+    render_footer("",
+                  "assets/logo.png", fixed=img_before_cropping is None)
 
 
 if __name__ == "__main__":
