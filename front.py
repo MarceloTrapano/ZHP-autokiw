@@ -9,6 +9,8 @@ from src import ZhpColor, AutoKiwBuilder
 from src.auto_kiw_builder import svg_to_jpg
 import base64
 import io
+import numpy as np
+import re
 
 
 @st.cache_data
@@ -21,6 +23,30 @@ def logo_data_uri(path: str, height: int = 160) -> str:
         buf = io.BytesIO()
         img.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+aspect_ratio_dict = {
+    "Facebook": [(1, 1), (1200, 1200)],
+    "Instagram": [(4, 5), (1080, 1350)],
+    "Custom": [(1, 2), (21, 21)]
+}
+
+
+def ratio_to_resolution(ratio):
+    idx = np.argmin(ratio)
+    base = 1200
+    result = [0, 0]
+    result[idx] = base
+    result[(idx+1) % 2] = int((base/ratio[idx])*ratio[(idx+1) % 2])
+    return result
+
+
+def scale_resolution(res, base=1200):
+    idx = np.argmin(res)
+    result = [0, 0]
+    result[idx] = base
+    result[(idx+1) % 2] = int((base/res[idx])*res[(idx+1) % 2])
+    return result
 
 
 FOOTER_CSS = f"""
@@ -90,6 +116,7 @@ def render_footer(left_logo: str, right_logo: str, fixed: bool = False) -> None:
 <div><strong>Aplikacja do obróbki zdjęć zgodnie z KIW ZHP</strong></div>
 <div>© 2026 Kacper Dąbrowski · <a href="mailto:kontakt@example.com">Kontakt</a></div>
 <div class="small">Zdjęcia nie są zapisywane na serwerze.</div>
+<div class="small">Aplikacja jest nieoficjalna i niezatwierdzona przez ZHP.</div>
 </div>
 <img class="footer-logo right" src="{right}" alt="Logo drużyny">
 </div></div>
@@ -121,16 +148,31 @@ def crop_picture(img_before_cropping):
 
     st.subheader("Przytnij zdjęcie")
 
+    aspect_type = st.pills(
+        "", ["Facebook", "Instagram", "Custom"], default="Facebook")
+
     img = ImageOps.exif_transpose(Image.open(img_before_cropping))
-    image_file = st_cropper(img, aspect_ratio=(1, 1),
-                            box_color="#000000", realtime_update=True)
 
-    st.write("Podgląd")
-    preview = image_file.copy()
-    preview.thumbnail((150, 150))
-    st.image(preview)
+    if aspect_type == "Custom":
+        image_file = st_cropper(img,
+                                box_color="#000000", realtime_update=True)
+        st.write()
+        st.write("Podgląd")
+        preview = image_file.copy()
+        preview.thumbnail((150, 150))
+        st.image(preview)
 
-    return image_file
+        return image_file, scale_resolution(image_file.size)
+    else:
+        image_file = st_cropper(img, aspect_ratio=aspect_ratio_dict[aspect_type][0],
+                                box_color="#000000", realtime_update=True)
+
+        st.write("Podgląd")
+        preview = image_file.copy()
+        preview.thumbnail((150, 150))
+        st.image(preview)
+
+        return image_file, aspect_ratio_dict[aspect_type][1]
 
 
 def get_title_and_subtitle() -> list[str, str]:
@@ -223,7 +265,7 @@ def check(image_file: Image.Image) -> bool:
     return True
 
 
-def start_the_process(image, main_text, secondary_text, author, color, use_cutout) -> bytes:
+def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         src = tmp / "input.png"
@@ -235,7 +277,13 @@ def start_the_process(image, main_text, secondary_text, author, color, use_cutou
                    .set_secondary_text(secondary_text)
                    .set_author(author)
                    .set_color(color)
-                   .set_cutout(use_cutout))
+                   .set_cutout(use_cutout)
+                   .set_image_shape(resolution))
+
+        if logo is not None:
+            logo_path = tmp / "logo.png"
+            Image.open(logo).convert("RGBA").save(logo_path)
+            builder = builder.set_logo_path(logo_path)
         try:
             builder.output_path = str(tmp / "out.svg")
             builder.build()
@@ -259,7 +307,7 @@ def main() -> None:
     img_before_cropping = add_picture()
 
     if img_before_cropping is not None:
-        image_file = crop_picture(img_before_cropping)
+        image_file, resolution = crop_picture(img_before_cropping)
 
         st.markdown("---")
 
@@ -268,7 +316,7 @@ def main() -> None:
 
         st.markdown("---")
 
-        st.subheader("Czy chcesz dodać autora zdjęcia?")
+        st.subheader("Dodaj autora zdjęcia")
         author = add_author()
 
         st.markdown("---")
@@ -297,6 +345,12 @@ def main() -> None:
         st.subheader("Czy chcesz wyciąć ramkę?")
         use_cutout = ask_to_use_ai()
 
+        st.markdown("---")
+
+        st.subheader("Dodaj logo")
+        logo = st.file_uploader("Wgraj zdjęcie", accept_multiple_files=False, type=[
+            "png", "jpg"], label_visibility="collapsed", key=123)
+
         st.divider()
         st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następnie kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
         _, _, _, col, _, _, _ = st.columns(7)
@@ -319,6 +373,8 @@ def main() -> None:
                             author=author,
                             color=selected_hex,
                             use_cutout=use_cutout,
+                            resolution=resolution,
+                            logo=logo,
                         )
                 except Exception as e:
                     st.session_state.error = f"Nie udało się wygenerować grafiki: {e}"

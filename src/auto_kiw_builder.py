@@ -331,8 +331,8 @@ class AutoKiwBuilder:
             top_layer.add(rect)
             image = self.dwg.image(
                 _image_href(self.logo_path),
-                insert=(265, 120),
-                size=(80, 80),
+                insert=(270, 124),
+                size=(65, 65),
             )
             top_layer.add(image)
         else:
