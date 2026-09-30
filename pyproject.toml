@@ -10,5 +10,8 @@ dependencies = [
     "modal>=1.5.5",
     "pillow>=12.3.0",
     "rembg[cpu]>=2.0.84",
+    "resvg-py>=0.5.0",
+    "streamlit>=1.64.0",
+    "streamlit-cropper>=0.3.1",
     "svgwrite>=1.4.3",
 ]
