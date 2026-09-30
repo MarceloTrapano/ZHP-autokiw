@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_cropper import st_cropper
+from streamlit_cropper import st_cropper, _resize_img
 from enum import StrEnum
 from src import ZhpColor, AutoKiwBuilder
 from PIL import Image, ImageOps
@@ -10,7 +10,6 @@ from src.auto_kiw_builder import svg_to_jpg
 import base64
 import io
 import numpy as np
-import re
 
 
 @st.cache_data
@@ -145,7 +144,6 @@ def crop_picture(img_before_cropping):
         return None
 
     st.markdown("---")
-
     st.subheader("Przytnij zdjęcie")
 
     aspect_type = st.pills(
@@ -153,26 +151,37 @@ def crop_picture(img_before_cropping):
 
     img = ImageOps.exif_transpose(Image.open(img_before_cropping))
 
+    # szerokość, którą komponent realnie wyświetli (to samo skalowanie co w bibliotece)
+    disp_w = _resize_img(img.copy()).width
+
+    st.markdown(
+        f"""
+        <style>
+        iframe[title="streamlit_cropper.st_cropper"] {{
+            display: block;
+            margin: 0 auto;
+            width: {disp_w}px !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if aspect_type == "Custom":
         image_file = st_cropper(img,
                                 box_color="#000000", realtime_update=True)
-        st.write()
-        st.write("Podgląd")
-        preview = image_file.copy()
-        preview.thumbnail((150, 150))
-        st.image(preview)
-
-        return image_file, scale_resolution(image_file.size)
+        res = scale_resolution(image_file.size)
     else:
         image_file = st_cropper(img, aspect_ratio=aspect_ratio_dict[aspect_type][0],
                                 box_color="#000000", realtime_update=True)
+        res = aspect_ratio_dict[aspect_type][1]
 
-        st.write("Podgląd")
-        preview = image_file.copy()
-        preview.thumbnail((150, 150))
-        st.image(preview)
+    st.write("Podgląd")
+    preview = image_file.copy()
+    preview.thumbnail((150, 150))
+    st.image(preview)
 
-        return image_file, aspect_ratio_dict[aspect_type][1]
+    return image_file, res
 
 
 def get_title_and_subtitle() -> list[str, str]:
@@ -192,12 +201,28 @@ def add_author() -> str:
     return author
 
 
-def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = "color") -> str | None:
-    """Umieszczenie na stronie kolorowych kafelków, z których użytkownik może wybrać jeden"""
-    st.text("Aby wybrać kolor, kliknij jeden z poniższych kafelków.")
-    state_key = f"{key_prefix}_selected"
-    if state_key not in st.session_state:
-        st.session_state[state_key] = None
+def _set_hex(hex_key: str, value: str) -> None:
+    st.session_state[hex_key] = value
+
+
+def choose_color(options: type[StrEnum], *, columns: int = 6,
+                 key_prefix: str = "color",
+                 default_hex: str | None = None) -> tuple[str, str]:
+    """Kafelki z palety plus klikalny podgląd wybranego koloru (color picker).
+
+    Zwraca (etykieta, hex).
+    """
+    st.text("Kliknij kafelek z palety albo podgląd koloru poniżej, aby wybrać własny.")
+    hex_key = f"{key_prefix}_hex"
+    preview_key = f"{key_prefix}_preview"
+
+    items = list(options)
+    if hex_key not in st.session_state:
+        st.session_state[hex_key] = str(default_hex or items[0].value)
+    current = st.session_state[hex_key]
+    current_name = next(
+        (c.name for c in items if str(c.value).lower() == current.lower()), None
+    )
 
     st.markdown(
         """
@@ -219,20 +244,48 @@ def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = 
             font-size: 0;
         }
         </style>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <style>
+        .st-key-{preview_key} {{
+            position: relative;
+            display: block;
+            flex: None !important;
+            width: 120px !important;
+            height: 60px !important;
+            min-height: 60px !important;
+            margin-left: auto;
+            background-color: {current} !important;
+            border: 1px solid #ccc !important;
+            border-radius: 8px !important;
+        }}
+        .st-key-{preview_key} div {{
+            position: absolute;
+            inset: 0;
+            width: 100% !important;
+            height: 100% !important;
+            min-width: 0 !important;
+            opacity: 0;
+            cursor: pointer;
+        }}
+        </style>
         """,
         unsafe_allow_html=True,
     )
 
-    items = list(options)
     rows = [items[i: i + columns] for i in range(0, len(items), columns)]
-
     for row in rows:
         cols = st.columns(len(row))
         for col, color in zip(cols, row):
             with col:
                 tile_key = f"{key_prefix}_tile_{color.name}"
-                is_selected = st.session_state[state_key] == color.name
-                border = "4px solid #1a1a1a" if is_selected else "2px solid rgba(0,0,0,0.15)"
+                is_selected = color.name == current_name
+                border = ("4px solid #1a1a1a" if is_selected
+                          else "2px solid rgba(0,0,0,0.15)")
                 with st.container(key=tile_key):
                     st.markdown(
                         f"""
@@ -245,11 +298,28 @@ def choose_color(options: type[StrEnum], *, columns: int = 6, key_prefix: str = 
                         """,
                         unsafe_allow_html=True,
                     )
-                    if st.button(" ", key=f"{tile_key}_btn", use_container_width=True):
-                        st.session_state[state_key] = color.name
-                        st.rerun()
+                    st.button(
+                        " ",
+                        key=f"{tile_key}_btn",
+                        use_container_width=True,
+                        on_click=_set_hex,
+                        args=(hex_key, str(color.value)),
+                    )
 
-    return st.session_state[state_key]
+    st.subheader("Wybrany kolor:")
+
+    label = ZhpColor.to_str(current_name) if current_name else "Własny kolor"
+
+    _, c1, _, c2, _ = st.columns([1, 2, 4, 2, 1], vertical_alignment="center")
+    with c1:
+        with st.container(key=preview_key):
+            st.color_picker("Wybrany kolor", key=hex_key,
+                            label_visibility="collapsed")
+    with c2:
+        st.markdown(
+            f'<i style="color:grey;">{label}</i>', unsafe_allow_html=True)
+
+    return current
 
 
 def ask_to_use_ai() -> bool:
@@ -296,7 +366,6 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
 
 
 def main() -> None:
-    selected_hex = ZhpColor.green_base
     st.markdown(
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
@@ -322,23 +391,9 @@ def main() -> None:
         st.markdown("---")
 
         st.subheader("Wybierz kolor")
-        selected_color = choose_color(ZhpColor, columns=6)
-
-        if selected_color:
-            selected_hex = ZhpColor[selected_color].value
-            st.subheader("Wybrany kolor:")
-            c1, c2 = st.columns([1, 4])
-            with c1:
-                st.markdown(
-                    f'<div style="width:60px;height:60px;border-radius:8px;'
-                    f'background-color:{selected_hex};border:1px solid #ccc;"></div>',
-                    unsafe_allow_html=True,
-                )
-            with c2:
-                st.markdown(
-                    f'<i style="color:grey;">{selected_color}</i>',
-                    unsafe_allow_html=True,
-                )
+        selected_hex = choose_color(
+            ZhpColor, columns=6, default_hex=ZhpColor.green_base
+        )
 
         st.markdown("---")
 
