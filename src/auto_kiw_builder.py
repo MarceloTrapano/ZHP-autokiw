@@ -176,7 +176,7 @@ class AutoKiwBuilder:
                     (self.main_box_start - self.gap, self.canvas_size[1] - 299 - self.gap,
                      self.canvas_size[0], self.canvas_size[1] - 299 + 80 + self.gap)
                 )
-            else:
+            elif self.main_text:
                 boxes.append(
                     (self.main_box_start - self.gap, self.canvas_size[1] - 220 - self.gap,
                      self.canvas_size[0], self.canvas_size[1] - 220 + 80 + self.gap)
@@ -228,7 +228,7 @@ class AutoKiwBuilder:
                     fill="black",
                 )
             )
-        else:
+        elif self.main_text:
             self.mask.add(
                 self.dwg.rect(
                     insert=(self.main_box_start - self.gap,
@@ -371,7 +371,7 @@ class AutoKiwBuilder:
             )
             top_layer.add(text)
 
-        else:
+        elif self.main_text:
             rect = self.dwg.rect(
                 insert=(self.main_box_start, self.canvas_size[1] - 220),
                 size=(1200, 80),
@@ -417,8 +417,6 @@ if __name__ == "__main__":
         .set_image_shape((1080, 1350))
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
         .set_color("#d9ff7a")
-        .set_main_text("28 września")
-        .set_secondary_text("AKCJA ZAŁÓŻ Mundur")
         .set_cutout(False)
         .set_author("Kacper Dąbrowski")
         .build()
