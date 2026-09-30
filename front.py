@@ -24,14 +24,13 @@ def add_picture() -> Image.Image:
     return img_before_cropping
 
 
-def crop_picture(img_before_cropping: Image.Image) -> Image.Image | None:
-    """Pozwala użytkownikowi wyciąć kwadratowy fragment wgranego zdjęcia"""
+def crop_picture(img_before_cropping):
     if not img_before_cropping:
         return None
 
     img = ImageOps.exif_transpose(Image.open(img_before_cropping))
-    image_file = st_cropper(img, aspect_ratio=(
-        1, 1), box_color="#000000", realtime_update=True)
+    image_file = st_cropper(img, aspect_ratio=(1, 1),
+                            box_color="#000000", realtime_update=True)
 
     st.write("Podgląd")
     preview = image_file.copy()
@@ -124,9 +123,9 @@ def ask_to_use_ai() -> bool:
     return use_cutout
 
 
-def check(image_file: Image.Image, main_text: str, color_name: str) -> bool:
+def check(image_file: Image.Image) -> bool:
     "Sprawdza, czy użytkownik uzupełnił obowiązkowe pola"
-    if not all([image_file, main_text, color_name]):
+    if not all([image_file]):
         return False
     return True
 
@@ -156,7 +155,7 @@ def start_the_process(image, main_text, secondary_text, author, color, use_cutou
 
 
 def main() -> None:
-    selected_hex = ""
+    selected_hex = ZhpColor.green_base
     st.markdown(
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
@@ -205,8 +204,8 @@ def main() -> None:
                   disabled=st.session_state.is_running)
 
     if st.session_state.is_running:
-        if not check(image_file, main_text, selected_color):
-            st.session_state.error = "Uzupełnij zdjęcie, tytuł i kolor."
+        if not check(image_file):
+            st.session_state.error = "Uzupełnij zdjęcie."
         else:
             st.session_state.error = None
             try:
