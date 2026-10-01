@@ -4,7 +4,6 @@ from svgwrite.extensions import Inkscape
 from .zhp_color import ZhpColor
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
-from typing import Optional
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -77,7 +76,6 @@ class AutoKiwBuilder:
         self.secondary_text = ""
         self.logo_path = ""
         self.author = ""
-        self.output_path = "test.svg"
         self.color = ZhpColor.green_base
         self.image_path = None
         self.use_ai_cutout = False
@@ -92,23 +90,12 @@ class AutoKiwBuilder:
         self.padding = 18
         self.gap = 7
         self.fontsize = 37
-        self.font_scale_main = 0.67
         self.text_pad_main = 125
-        self.font_scale_secondary = 0.8
         self.text_pad_secondary = 125
         self.font_y_pad = 53
 
-        self.main_text_size = 0
-        self.secondary_text_size = 0
-
-        self.main_box_start = self.canvas_size[0] - (
-            self.main_text_size * self.fontsize * self.font_scale_main + self.text_pad_main
-        )
-
-        self.secondary_box_start = self.canvas_size[0] - (
-            self.secondary_text_size * self.fontsize * self.font_scale_secondary
-            + self.text_pad_secondary
-        )
+        self.main_box_start = 0
+        self.secondary_box_start = 0
 
     def _get_session(self):
         if self._session is None:
@@ -143,7 +130,7 @@ class AutoKiwBuilder:
         font = "Museo Sans 100" if self.secondary_text else "Museo Sans 900"
         pad = self.text_pad_secondary if self.secondary_text else self.text_pad_main
         self.main_box_start = self.canvas_size[0] - (
-            text_width(text, font, size=self.fontsize) + self.text_pad_main
+            text_width(text, font, size=self.fontsize) + pad
         )
         return self
 
