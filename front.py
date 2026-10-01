@@ -268,10 +268,10 @@ def crop_picture(img_before_cropping):
 
 def get_title_and_subtitle() -> list[str, str]:
     """Pobranie od użytkownika tytułu zdjęcia oraz opcjonalnie podtytułu"""
-    main_text = st.text_input("Wpisz tytuł zdjęcia", max_chars=30)
+    main_text = st.text_input("Wpisz tytuł zdjęcia", max_chars=45)
     secondary_text = ""
     if st.checkbox("Dodaj podtytuł"):
-        secondary_text = st.text_input("Wpisz podtytuł", max_chars=30)
+        secondary_text = st.text_input("Wpisz podtytuł", max_chars=45)
     return [main_text, secondary_text]
 
 
