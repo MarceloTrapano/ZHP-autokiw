@@ -14,6 +14,7 @@ import os
 import io
 import subprocess
 import shutil
+import json
 
 
 def svg_to_jpg(svg_path: str, jpg_path: str, size: int = (1200, 1200), quality: int = 90, background=(255, 255, 255)):
@@ -56,6 +57,16 @@ class Assets:
     WOSM_LOGO = BASE_DIR / "WOSM_logo.png"
     WAGGS_LOGO = BASE_DIR / "WAGGS_logo.png"
     ZHP_LOGO = BASE_DIR / "zhp_logo.png"
+    WIDTHS = {f["name"]: {**f["uppercase"], " ": f["other"]["space"], "-": f["other"]["hyphen"]}
+              for f in json.load(open(BASE_DIR / "museo_sans_widths.json", encoding="utf-8"))["fonts"]}
+
+
+FALLBACK_WIDTH = 25
+
+
+def text_width(text, font, size=37):
+    w = Assets.WIDTHS[font]
+    return sum(w.get(ch, FALLBACK_WIDTH) for ch in text.upper()) * size / 37
 
 
 class AutoKiwBuilder:
@@ -82,9 +93,9 @@ class AutoKiwBuilder:
         self.gap = 7
         self.fontsize = 37
         self.font_scale_main = 0.67
-        self.text_pad_main = 100
+        self.text_pad_main = 125
         self.font_scale_secondary = 0.8
-        self.text_pad_secondary = 140
+        self.text_pad_secondary = 125
         self.font_y_pad = 53
 
         self.main_text_size = 0
@@ -128,33 +139,19 @@ class AutoKiwBuilder:
 
     def set_main_text(self, text: str):
         self.main_text = text
-        self.main_text_size = 0
-        for letter in self.main_text:
-            if letter.lower() in [" ", "i", "-"]:
-                self.main_text_size += 0.5
-            elif letter.lower() in ["e"]:
-                self.main_text_size += 0.75
-            else:
-                self.main_text_size += 1
-        scale = self.font_scale_secondary if self.secondary_text else self.font_scale_main
+
+        font = "Museo Sans 100" if self.secondary_text else "Museo Sans 900"
+        pad = self.text_pad_secondary if self.secondary_text else self.text_pad_main
         self.main_box_start = self.canvas_size[0] - (
-            self.main_text_size * self.fontsize * scale + self.text_pad_main
+            text_width(text, font, size=self.fontsize) + self.text_pad_main
         )
         return self
 
     def set_secondary_text(self, text: str):
         self.secondary_text = text
-        self.secondary_text_size = 0
-        for letter in self.secondary_text:
-            if letter.lower() in [" ", "i", "-"]:
-                self.secondary_text_size += 0.5
-            elif letter.lower() in ["e"]:
-                self.secondary_text_size += 0.75
-            else:
-                self.secondary_text_size += 1
         self.secondary_box_start = self.canvas_size[0] - (
-            self.secondary_text_size * self.fontsize * self.font_scale_main
-            + self.text_pad_secondary
+            text_width(text, "Museo Sans 900", self.fontsize) +
+            self.text_pad_main
         )
         return self
 
