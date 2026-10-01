@@ -98,7 +98,6 @@ FOOTER_CSS = f"""
     padding-bottom: 0 !important;
     margin-bottom: 0 !important;
 }}
-/* pusty kontener na st.chat_input, którego nie używasz */
 [data-testid="stBottom"] {{ display: none; }}
 [data-testid="stAppViewContainer"] {{ overflow-x: hidden; }}
 
@@ -128,28 +127,50 @@ FOOTER_CSS = f"""
 .footer-text a {{ color: #ffffff; text-decoration: underline; }}
 .footer-text .small {{ opacity: 0.75; font-size: 0.8rem; }}
 
-/* --- EKSTREMALNIE ODCHUDZONA WERSJA MOBILNA --- */
 @media (max-width: 600px) {{
     .app-footer {{
-        padding: 8px 12px;       /* Bardzo mały margines wewnętrzny */
+        padding: 8px 12px;       
         margin-top: 1rem;
-        line-height: 1.2;        /* Ściśnięcie tekstu w pionie (Kluczowe!) */
+        line-height: 1.2;        
     }}
     .footer-inner {{ 
-        flex-wrap: nowrap;       /* Wymuszenie ułożenia w jednej linii (bez spadania pod spód) */
+        flex-wrap: nowrap;      
         gap: 12px;
     }}
     .footer-logo {{ 
-        height: 40px;            /* Małe logo */
-        order: 2;                /* Logo wymuszone po prawej stronie */
+        height: 40px;            
+        order: 2;              
     }}
     .footer-text {{ 
-        order: 1;                /* Tekst wymuszony po lewej stronie */
-        text-align: left;        /* Do lewej, żeby zyskać na czytelności przy ścisku */
-        font-size: 0.65rem;      /* Znacznie mniejsza główna czcionka */
+        order: 1;              
+        text-align: left;       
+        font-size: 0.65rem;    
     }}
     .footer-text .small {{ 
-        font-size: 0.55rem;      /* Bardzo mała czcionka dla adnotacji */
+        font-size: 0.55rem;  
+    }}
+}}
+@media (max-height: 750px) {{
+    .app-footer {{
+        padding: 8px 12px;       
+        margin-top: 1rem;
+        line-height: 1.2;        
+    }}
+    .footer-inner {{ 
+        flex-wrap: nowrap;      
+        gap: 12px;
+    }}
+    .footer-logo {{ 
+        height: 40px;            
+        order: 2;              
+    }}
+    .footer-text {{ 
+        order: 1;              
+        text-align: left;       
+        font-size: 0.65rem;    
+    }}
+    .footer-text .small {{ 
+        font-size: 0.55rem;  
     }}
 }}
 </style>
@@ -171,9 +192,10 @@ def render_footer(left_logo: str, right_logo: str, fixed: bool = False) -> None:
 <div class="app-footer"><div class="footer-inner">
 <div class="footer-text">
 <div><strong>Aplikacja do obróbki zdjęć zgodnie z KIW ZHP</strong></div>
-<div>© 2026 Kacper Dąbrowski · <a href="mailto:kontakt@example.com">Kontakt</a></div>
+<div>© 2026 Kacper Dąbrowski · <a href="mailto:dabrowski.kacper@zhp.net.pl">Kontakt</a></div>
 <div class="small">Zdjęcia nie są zapisywane na serwerze.</div>
-<div class="small">Aplikacja jest nieoficjalna i niezatwierdzona przez ZHP.</div>
+<div class="small">Aplikacja jest nieoficjalna i niezatwierdzona przez ZHP.  </div>
+<div class="small">Jeśli Ci się spodobała to możesz postawić symboliczną kawkę (lepiej herbate) · <a href="mailto:kontakt@example.com">Postaw kawke</a> </div>
 </div>
 <img class="footer-logo right" src="{right}" alt="Logo drużyny">
 </div></div>
@@ -580,6 +602,8 @@ def main() -> None:
             st.download_button("Pobierz JPG", st.session_state.result,
                                "grafika.jpg", "image/jpeg")
 
+    st.space("xxlarge")
+    st.space("xxlarge")
     render_footer("",
                   "assets/logo.png", fixed=img_before_cropping is None)
 
