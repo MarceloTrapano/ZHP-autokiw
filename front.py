@@ -204,7 +204,7 @@ def crop_picture(img_before_cropping):
         st.subheader("Przytnij zdjęcie")
     with c2:
         aspect_type = st.pills(
-            "Wybierz typ", ["Facebook", "Instagram", "Custom"], default="Facebook"
+            "Wybierz typ", ["Facebook", "Instagram", "Dowolny"], default="Facebook"
         )
 
     img_high_res = ImageOps.exif_transpose(Image.open(img_before_cropping))
