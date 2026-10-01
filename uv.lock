@@ -2501,6 +2501,42 @@ wheels = [
 ]
 
 [[package]]
+name = "streamlit-cropperjs"
+version = "0.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/1a/092207a2a6523d88ade6b5154f224a840f212d2858f106c3420b3c40fe6c/streamlit-cropperjs-0.0.9.tar.gz", hash = "sha256:8d8c08d3e8d71818736ff1f2e0b890b75f66eb87edd10af9a7731d06e1b38697", size = 369916, upload-time = "2024-04-14T03:42:54.345Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/c7/51e075dee6143c4336199e9ad7c4dd7e15147530fd7c60bf161b74ea76e5/streamlit_cropperjs-0.0.9-py3-none-any.whl", hash = "sha256:057bd73d12c48628ceb4e99c396fe8c8ce626f0a510327d99f259a6978f3cfc5", size = 373419, upload-time = "2024-04-14T03:42:52.383Z" },
+]
+
+[[package]]
+name = "streamlit-drawable-canvas"
+version = "0.13.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/04/57c835ba28a67f6f1dbd4c78d58dc333606ee2b958044bb554b73c0c7e23/streamlit_drawable_canvas-0.13.0.tar.gz", hash = "sha256:9e65b8abfc8b1fdd541425ac8ff24d320d5067b8646f58bb29e199188fbff3e8", size = 130970, upload-time = "2026-09-04T23:02:25.249Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/40/0aff91c8f853dcb0ff75a6d46c37c67855162f42b59cc8492ad2c387e574/streamlit_drawable_canvas-0.13.0-py3-none-any.whl", hash = "sha256:3120cb0be0b499a456eed18a987b07a73e74952fd5911bd4cde04ceb96ed41b6", size = 125646, upload-time = "2026-09-04T23:02:24.047Z" },
+]
+
+[[package]]
+name = "streamlit-javascript"
+version = "0.1.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/69/723ebc7a58057b1e6f54d0c23c86488054d756e0e470daf4db703fe02a63/streamlit-javascript-0.1.5.tar.gz", hash = "sha256:9da5176522a0acf2c39d3b0bec9f856fdd8ea3c70bb1066841a546ab1348ae1d", size = 512374, upload-time = "2022-05-13T07:48:47.802Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/81/0c9e9e4d2dab97224efe105ba44f47b259f37d8e7673b94f5b5523fe2c8f/streamlit_javascript-0.1.5-py3-none-any.whl", hash = "sha256:36ca4d8c46fd5b6526d1a705530472e03cb6e5bb24694330649f21d5c436d280", size = 518387, upload-time = "2022-05-13T07:48:45.406Z" },
+]
+
+[[package]]
 name = "svgwrite"
 version = "1.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -3003,6 +3039,9 @@ dependencies = [
     { name = "resvg-py" },
     { name = "streamlit" },
     { name = "streamlit-cropper" },
+    { name = "streamlit-cropperjs" },
+    { name = "streamlit-drawable-canvas" },
+    { name = "streamlit-javascript" },
     { name = "svgwrite" },
 ]
 
@@ -3016,5 +3055,8 @@ requires-dist = [
     { name = "resvg-py", specifier = ">=0.5.0" },
     { name = "streamlit", specifier = ">=1.64.0" },
     { name = "streamlit-cropper", specifier = ">=0.3.1" },
+    { name = "streamlit-cropperjs", specifier = ">=0.0.9" },
+    { name = "streamlit-drawable-canvas", specifier = ">=0.13.0" },
+    { name = "streamlit-javascript", specifier = ">=0.1.5" },
     { name = "svgwrite", specifier = ">=1.4.3" },
 ]

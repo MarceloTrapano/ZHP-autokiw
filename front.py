@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from src import ZhpColor, AutoKiwBuilder
 from src.auto_kiw_builder import svg_to_jpg
+from streamlit_javascript import st_javascript
 import subprocess
 import shutil
 import base64
@@ -46,6 +47,7 @@ def setup_system_fonts():
 
 
 setup_system_fonts()
+window_width = st_javascript("window.innerWidth")
 
 
 @st.cache_data
@@ -122,13 +124,29 @@ FOOTER_CSS = f"""
 .footer-text a {{ color: #ffffff; text-decoration: underline; }}
 .footer-text .small {{ opacity: 0.75; font-size: 0.8rem; }}
 
-/* wąskie ekrany: logotypy w jednym rzędzie, tekst pod spodem */
-@media (max-width: 640px) {{
-    .footer-inner {{ flex-wrap: wrap; }}
-    .footer-logo {{ height: 56px; }}
-    .footer-logo.left {{ order: 1; }}
-    .footer-logo.right {{ order: 2; }}
-    .footer-text {{ order: 3; flex-basis: 100%; }}
+/* --- EKSTREMALNIE ODCHUDZONA WERSJA MOBILNA --- */
+@media (max-width: 600px) {{
+    .app-footer {{
+        padding: 8px 12px;       /* Bardzo mały margines wewnętrzny */
+        margin-top: 1rem;
+        line-height: 1.2;        /* Ściśnięcie tekstu w pionie (Kluczowe!) */
+    }}
+    .footer-inner {{ 
+        flex-wrap: nowrap;       /* Wymuszenie ułożenia w jednej linii (bez spadania pod spód) */
+        gap: 12px;
+    }}
+    .footer-logo {{ 
+        height: 40px;            /* Małe logo */
+        order: 2;                /* Logo wymuszone po prawej stronie */
+    }}
+    .footer-text {{ 
+        order: 1;                /* Tekst wymuszony po lewej stronie */
+        text-align: left;        /* Do lewej, żeby zyskać na czytelności przy ścisku */
+        font-size: 0.65rem;      /* Znacznie mniejsza główna czcionka */
+    }}
+    .footer-text .small {{ 
+        font-size: 0.55rem;      /* Bardzo mała czcionka dla adnotacji */
+    }}
 }}
 </style>
 """
@@ -186,8 +204,13 @@ def crop_picture(img_before_cropping):
         "", ["Facebook", "Instagram", "Custom"], default="Facebook")
 
     img = ImageOps.exif_transpose(Image.open(img_before_cropping))
+    if window_width > 600:
+        MAX_SIZE = 1200
+    else:
+        MAX_SIZE = 400
+    if img.size[0] > MAX_SIZE:
+        img.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
 
-    # szerokość, którą komponent realnie wyświetli (to samo skalowanie co w bibliotece)
     disp_w = _resize_img(img.copy()).width
 
     st.markdown(
@@ -197,6 +220,8 @@ def crop_picture(img_before_cropping):
             display: block;
             margin: 0 auto;
             width: {disp_w}px !important;
+            max-width: 100vw !important;
+            box-sizing: border-box;
         }}
         </style>
         """,
@@ -243,7 +268,7 @@ def _set_hex(hex_key: str, value: str) -> None:
 
 def choose_color(options: type[StrEnum], *, columns: int = 6,
                  key_prefix: str = "color",
-                 default_hex: str | None = None) -> tuple[str, str]:
+                 default_hex: str | None = None) -> str:
     """Kafelki z palety plus klikalny podgląd wybranego koloru (color picker).
 
     Zwraca (etykieta, hex).
@@ -261,9 +286,9 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
     )
 
     st.markdown(
-        """
+        f"""
         <style>
-        div[data-testid="stVerticalBlockBorderWrapper"] button {
+        div[data-testid="stVerticalBlockBorderWrapper"] button {{
             width: 100%;
             aspect-ratio: 1 / 1;
             border: 2px solid rgba(0,0,0,0.15);
@@ -271,16 +296,33 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
             font-size: 0.75rem;
             font-weight: 600;
             transition: transform 0.08s ease-in-out;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"] button:hover {
+            padding: 0 !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"] button:hover {{
             transform: scale(1.05);
             border-color: rgba(0,0,0,0.4);
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"] button p {
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"] button p {{
             font-size: 0;
-        }
+        }}
+        
+        /* Wymuszenie siatki (gridu) dla kafelków na urządzeniach mobilnych */
+        @media (max-width: 640px) {{
+            div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) {{
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+            }}
+            div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) > div[data-testid="stColumn"],
+            div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) > div[data-testid="column"] {{
+                width: calc((100% / {columns}) - 8px) !important;
+                min-width: calc((100% / {columns}) - 8px) !important;
+                flex: 1 1 auto !important;
+                padding: 0 !important;
+            }}
+        }}
         </style>
-""",
+        """,
         unsafe_allow_html=True,
     )
 
@@ -427,9 +469,14 @@ def main() -> None:
         st.markdown("---")
 
         st.subheader("Wybierz kolor")
-        selected_hex = choose_color(
-            ZhpColor, columns=6, default_hex=ZhpColor.green_base
-        )
+        if window_width > 600:
+            selected_hex = choose_color(
+                ZhpColor, columns=6, default_hex=ZhpColor.green_base
+            )
+        else:
+            selected_hex = choose_color(
+                ZhpColor, columns=3, default_hex=ZhpColor.green_base
+            )
 
         st.markdown("---")
 

@@ -13,5 +13,8 @@ dependencies = [
     "resvg-py>=0.5.0",
     "streamlit>=1.64.0",
     "streamlit-cropper>=0.3.1",
+    "streamlit-cropperjs>=0.0.9",
+    "streamlit-drawable-canvas>=0.13.0",
+    "streamlit-javascript>=0.1.5",
     "svgwrite>=1.4.3",
 ]
