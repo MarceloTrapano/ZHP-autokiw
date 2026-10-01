@@ -203,15 +203,17 @@ def crop_picture(img_before_cropping):
     aspect_type = st.pills(
         "", ["Facebook", "Instagram", "Custom"], default="Facebook")
 
-    img = ImageOps.exif_transpose(Image.open(img_before_cropping))
-    if window_width > 600:
-        MAX_SIZE = 1200
-    else:
-        MAX_SIZE = 400
-    if img.size[0] > MAX_SIZE:
-        img.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
+    img_high_res = ImageOps.exif_transpose(Image.open(img_before_cropping))
+    MAX_BASE = 1920
+    if max(img_high_res.size) > MAX_BASE:
+        img_high_res.thumbnail((MAX_BASE, MAX_BASE), Image.LANCZOS)
 
-    disp_w = _resize_img(img.copy()).width
+    preview_max = int(window_width - 60) if (window_width and 0 <
+                                             window_width < 600) else 700
+
+    img_preview = img_high_res.copy()
+    img_preview.thumbnail((preview_max, preview_max), Image.LANCZOS)
+    disp_w = img_preview.width
 
     st.markdown(
         f"""
@@ -221,7 +223,6 @@ def crop_picture(img_before_cropping):
             margin: 0 auto;
             width: {disp_w}px !important;
             max-width: 100vw !important;
-            box-sizing: border-box;
         }}
         </style>
         """,
@@ -229,15 +230,27 @@ def crop_picture(img_before_cropping):
     )
 
     if aspect_type == "Custom":
-        image_file = st_cropper(img,
-                                box_color="#000000", realtime_update=True)
+        box = st_cropper(img_preview, box_color="#000000",
+                         realtime_update=True, return_type="box")
+    else:
+        box = st_cropper(img_preview, aspect_ratio=aspect_ratio_dict[aspect_type][0],
+                         box_color="#000000", realtime_update=True, return_type="box")
+
+    scale = img_high_res.width / img_preview.width
+
+    left = int(box['left'] * scale)
+    top = int(box['top'] * scale)
+    right = int((box['left'] + box['width']) * scale)
+    bottom = int((box['top'] + box['height']) * scale)
+
+    image_file = img_high_res.crop((left, top, right, bottom))
+
+    if aspect_type == "Custom":
         res = scale_resolution(image_file.size)
     else:
-        image_file = st_cropper(img, aspect_ratio=aspect_ratio_dict[aspect_type][0],
-                                box_color="#000000", realtime_update=True)
         res = aspect_ratio_dict[aspect_type][1]
 
-    st.write("Podgląd")
+    st.write("Ostateczny podgląd:")
     preview = image_file.copy()
     preview.thumbnail((150, 150))
     st.image(preview)
