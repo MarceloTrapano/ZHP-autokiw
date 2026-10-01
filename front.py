@@ -65,7 +65,7 @@ def logo_data_uri(path: str, height: int = 160) -> str:
 aspect_ratio_dict = {
     "Facebook": [(1, 1), (1200, 1200)],
     "Instagram": [(4, 5), (1080, 1350)],
-    "Custom": [(1, 2), (21, 21)]
+    "Dowolny": [(1, 2), (21, 21)]
 }
 
 
@@ -198,10 +198,14 @@ def crop_picture(img_before_cropping):
         return None
 
     st.markdown("---")
-    st.subheader("Przytnij zdjęcie")
 
-    aspect_type = st.pills(
-        "", ["Facebook", "Instagram", "Custom"], default="Facebook")
+    c1, c2 = st.columns([3, 2])
+    with c1:
+        st.subheader("Przytnij zdjęcie")
+    with c2:
+        aspect_type = st.pills(
+            "Wybierz typ", ["Facebook", "Instagram", "Custom"], default="Facebook"
+        )
 
     img_high_res = ImageOps.exif_transpose(Image.open(img_before_cropping))
     MAX_BASE = 1920
@@ -229,7 +233,7 @@ def crop_picture(img_before_cropping):
         unsafe_allow_html=True,
     )
 
-    if aspect_type == "Custom":
+    if aspect_type == "Dowolny":
         box = st_cropper(img_preview, box_color="#000000",
                          realtime_update=True, return_type="box")
     else:
@@ -250,7 +254,7 @@ def crop_picture(img_before_cropping):
     else:
         res = aspect_ratio_dict[aspect_type][1]
 
-    st.write("Ostateczny podgląd:")
+    st.write("Podgląd:")
     preview = image_file.copy()
     preview.thumbnail((150, 150))
     st.image(preview)
@@ -349,7 +353,6 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
             width: 120px !important;
             height: 60px !important;
             min-height: 60px !important;
-            margin-left: auto;
             background-color: {current} !important;
             border: 1px solid #ccc !important;
             border-radius: 8px !important;
@@ -401,14 +404,14 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
 
     label = ZhpColor.to_str(current_name) if current_name else "Własny kolor"
 
-    _, c1, _, c2, _ = st.columns([1, 2, 4, 2, 1], vertical_alignment="center")
+    c1, c2 = st.columns([1, 2], vertical_alignment="center")
     with c1:
         with st.container(key=preview_key):
             st.color_picker("Wybrany kolor", key=hex_key,
                             label_visibility="collapsed")
     with c2:
         st.markdown(
-            f'<i style="color:grey;">{label}</i>', unsafe_allow_html=True)
+            f'<i style="color:grey; font-size: 1rem;">{label}</i>', unsafe_allow_html=True)
 
     return current
 
@@ -461,6 +464,37 @@ def main() -> None:
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
     )
+    st.markdown("""
+            <style>
+            [data-testid="stFileUploader"] button {
+                color: transparent !important;
+                position: relative; 
+            }
+            [data-testid="stFileUploader"] button::after {
+                content: "Wybierz plik";
+                color: #87a428; 
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                font-weight: 400;
+                visibility: visible !important;
+            }
+            [data-testid="stFileUploader"]:has(small) button::after {
+                content: none !important;
+            }
+
+            [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
+                display: none !important;
+            }
+            [data-testid="stFileUploaderDropzoneInstructions"] > div::after {
+                content: "Limit 200MB na plik • PNG, JPG";
+                display: block !important;
+                font-size: 14px;
+                color: rgba(49, 51, 63, 0.6); /* Domyślny szary kolor Streamlit */
+            }
+            </style>
+        """, unsafe_allow_html=True)
     st.markdown("---")
 
     st.subheader("Wgraj zdjęcie")
