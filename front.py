@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_cropper import st_cropper, _resize_img
+from streamlit_cropper import st_cropper
 from enum import StrEnum
 from src import ZhpColor, AutoKiwBuilder
 from PIL import Image, ImageOps
@@ -46,6 +46,10 @@ def setup_system_fonts():
             "Nie znaleziono komendy 'fc-cache'. Upewnij się, że pakiet 'fontconfig' jest zainstalowany.")
 
 
+st.set_page_config(
+    page_title="ZHP Autokiw",
+    page_icon=Image.open("assets/logo.png"),
+)
 setup_system_fonts()
 window_width = st_javascript("window.innerWidth")
 
