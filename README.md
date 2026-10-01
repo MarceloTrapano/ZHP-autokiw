@@ -5,7 +5,6 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/uv-fast-magenta)](https://github.com/astral-sh/uv)
 [![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)](https://streamlit.io/)
-[![Modal](https://img.shields.io/badge/backend-Modal-green)](https://modal.com/)
 [![SVG](https://img.shields.io/badge/output-SVG-orange)](https://developer.mozilla.org/docs/Web/SVG)
 
 *Narzędzie napisane w Pythonie, które automatycznie tworzy grafiki zgodnie z Katalogiem Identyfikacji Wizualnej ZHP.*
