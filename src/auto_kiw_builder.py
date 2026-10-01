@@ -81,9 +81,9 @@ class AutoKiwBuilder:
         self.padding = 18
         self.gap = 7
         self.fontsize = 37
-        self.font_scale_main = 0.73
+        self.font_scale_main = 0.67
         self.text_pad_main = 100
-        self.font_scale_secondary = 0.61
+        self.font_scale_secondary = 0.8
         self.text_pad_secondary = 140
         self.font_y_pad = 53
 
@@ -130,12 +130,15 @@ class AutoKiwBuilder:
         self.main_text = text
         self.main_text_size = 0
         for letter in self.main_text:
-            if letter.lower() in [" ", "i", "e", "-"]:
+            if letter.lower() in [" ", "i", "-"]:
                 self.main_text_size += 0.5
+            elif letter.lower() in ["e"]:
+                self.main_text_size += 0.75
             else:
                 self.main_text_size += 1
+        scale = self.font_scale_secondary if self.secondary_text else self.font_scale_main
         self.main_box_start = self.canvas_size[0] - (
-            self.main_text_size * self.fontsize * self.font_scale_main + self.text_pad_main
+            self.main_text_size * self.fontsize * scale + self.text_pad_main
         )
         return self
 
@@ -143,12 +146,14 @@ class AutoKiwBuilder:
         self.secondary_text = text
         self.secondary_text_size = 0
         for letter in self.secondary_text:
-            if letter.lower() in [" ", "i", "e", "-"]:
+            if letter.lower() in [" ", "i", "-"]:
                 self.secondary_text_size += 0.5
+            elif letter.lower() in ["e"]:
+                self.secondary_text_size += 0.75
             else:
                 self.secondary_text_size += 1
         self.secondary_box_start = self.canvas_size[0] - (
-            self.secondary_text_size * self.fontsize * self.font_scale_secondary
+            self.secondary_text_size * self.fontsize * self.font_scale_main
             + self.text_pad_secondary
         )
         return self
