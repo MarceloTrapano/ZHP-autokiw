@@ -381,7 +381,7 @@ class AutoKiwBuilder:
                 self.secondary_text.upper(),
                 insert=(
                     self.canvas_size[0] - 60, self.canvas_size[1] - 220 + self.font_y_pad),
-                font_family="Museo Sans 100",
+                font_family="Museo Sans 900",
                 font_size=self.fontsize,
                 fill="white",
                 text_anchor="end",
@@ -392,7 +392,7 @@ class AutoKiwBuilder:
                 self.main_text.upper(),
                 insert=(
                     self.canvas_size[0] - 60, self.canvas_size[1] - 299 + self.font_y_pad),
-                font_family="Museo Sans 900",
+                font_family="Museo Sans 100",
                 font_size=self.fontsize,
                 fill="white",
                 text_anchor="end",
