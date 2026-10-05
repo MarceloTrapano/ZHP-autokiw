@@ -22,14 +22,20 @@ FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 
 def setup_logging() -> logging.Logger:
-    root = logging.getLogger()
-    if not root.handlers:
-        logging.basicConfig(level=logging.INFO, format=FORMAT)
-        root.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(FORMAT))
 
-    logger = logging.getLogger("zhp_autokiw")
-    logger.setLevel(logging.INFO)
-    return logger
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if handler not in root.handlers:
+        root.addHandler(handler)
+
+    for name in ("src", "zhp_autokiw"):
+        mod_logger = logging.getLogger(name)
+        mod_logger.setLevel(logging.INFO)
+        mod_logger.propagate = True
+
+    return logging.getLogger("zhp_autokiw")
 
 
 logger = setup_logging()
