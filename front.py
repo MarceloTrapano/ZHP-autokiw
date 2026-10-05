@@ -13,6 +13,28 @@ import shutil
 import base64
 import io
 import numpy as np
+import threading
+from PIL import ImageDraw
+
+
+@st.cache_resource
+def warm_up_pipeline():
+    """Jednorazowo na proces: pobiera model, ładuje ONNX, kompiluje numbę."""
+    def _run():
+        try:
+            img = Image.new("RGB", (800, 800), (200, 200, 200))
+            ImageDraw.Draw(img).ellipse(
+                (200, 150, 600, 750), fill=(120, 60, 40))
+            start_the_process(
+                image=img, logo=None, main_text="x", secondary_text="",
+                author="", color=str(ZhpColor.green_base), use_cutout=True,
+                resolution=aspect_ratio_dict["Facebook"][1],
+            )
+        except Exception:
+            pass  # rozgrzewka nie może psuć aplikacji
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return t
 
 
 @st.cache_resource
@@ -482,6 +504,9 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
             return out.read_bytes()
         finally:
             builder.close()
+
+
+warm_up_pipeline()
 
 
 def main() -> None:
