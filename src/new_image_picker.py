@@ -65,6 +65,8 @@ export default function (component) {
   labelText.textContent = (data && data.label) || "Wybierz zdjęcie";
   const maxSide = (data && data.maxSide) || 1920;
   const quality = (data && data.quality) || 0.92;
+  const isPng = data && data.format === "png";
+  const mime = isPng ? "image/png" : "image/jpeg";
 
   async function decode(file) {
     try {
@@ -97,12 +99,14 @@ export default function (component) {
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#ffffff";          // przezroczyste PNG -> białe tło
-      ctx.fillRect(0, 0, w, h);
+      if (!isPng) {                       // JPEG nie ma przezroczystości -> białe tło
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+      }
       ctx.drawImage(img, 0, 0, w, h);
       if (img.close) img.close();
 
-      const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", quality));
+      const blob = await new Promise((r) => canvas.toBlob(r, mime, quality));
       const dataUrl = await new Promise((resolve, reject) => {
         const fr = new FileReader();
         fr.onload = () => resolve(fr.result);
@@ -142,17 +146,23 @@ def image_picker(
     label: str = "Wybierz zdjęcie",
     max_side: int = 1920,
     quality: float = 0.92,
+    output_format: str = "jpeg",
 ) -> Image.Image | None:
-    """Zwraca zdjęcie jako PIL.Image (RGB) albo None, jeśli nic nie wybrano.
+    """Zwraca zdjęcie jako PIL.Image albo None, jeśli nic nie wybrano.
 
     Zdjęcie jest już obrócone zgodnie z EXIF i zmniejszone do max_side px.
+    output_format="jpeg" -> RGB (zdjęcia),
+    output_format="png"  -> RGBA z zachowaną przezroczystością (logo).
     """
+    fmt = "png" if output_format == "png" else "jpeg"
     result = _component(
         key=key,
-        data={"label": label, "maxSide": max_side, "quality": quality},
+        data={"label": label, "maxSide": max_side,
+              "quality": quality, "format": fmt},
     )
     payload = getattr(result, "image", None)
     if not payload:
         return None
     raw = base64.b64decode(payload["data"])
-    return Image.open(io.BytesIO(raw)).convert("RGB")
+    mode = "RGBA" if fmt == "png" else "RGB"
+    return Image.open(io.BytesIO(raw)).convert(mode)

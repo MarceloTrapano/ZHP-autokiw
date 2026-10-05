@@ -471,7 +471,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
 
         if logo is not None:
             logo_path = tmp / "logo.png"
-            Image.open(logo).convert("RGBA").save(logo_path)
+            logo.convert("RGBA").save(logo_path)
             builder = builder.set_logo_path(logo_path)
         try:
             builder.output_path = str(tmp / "out.svg")
@@ -558,8 +558,12 @@ def main() -> None:
         st.markdown("---")
 
         st.subheader("Dodaj logo")
-        logo = st.file_uploader("Wgraj zdjęcie", accept_multiple_files=False, type=[
-            "png", "jpg"], label_visibility="collapsed", key=123)
+        logo = image_picker(
+            key="logo_picker",
+            label="Wybierz logo (opcjonalnie)",
+            max_side=800,
+            output_format="png",
+        )
 
         st.divider()
         st.text("Upewnij się, że wszystkie ustawienia są poprawne. Następnie kliknij przycisk OK, aby uzyskać obrobione zdjęcie.")
