@@ -34,9 +34,9 @@ class EmojiFormatter(logging.Formatter):
     def format(self, record):
         emoji = LEVEL_EMOJI.get(record.levelno, "•")
         ts = self.formatTime(record, "%H:%M:%S")
-
+        name = record.name
         msg = record.getMessage()
-        line = f"[{_ORANGE}{ts}{_RESET}] {emoji} {msg}"
+        line = f"[{_ORANGE}{ts}{_RESET}] {emoji} [{name}] {msg}"
         if record.exc_info:
             line += "\n" + self.formatException(record.exc_info)
         return line
