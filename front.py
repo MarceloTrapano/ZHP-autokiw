@@ -5,7 +5,7 @@ from src import ZhpColor, AutoKiwBuilder
 from PIL import Image, ImageOps
 import tempfile
 from pathlib import Path
-from src import ZhpColor, AutoKiwBuilder
+from src import ZhpColor, AutoKiwBuilder, image_picker
 from src.auto_kiw_builder import svg_to_jpg
 from streamlit_javascript import st_javascript
 import subprocess
@@ -214,13 +214,11 @@ def lock_button():
 
 def add_picture() -> Image.Image:
     """Pozwala użytkownikowi wgrać zdjęcie do przerobienia"""
-    img_before_cropping = st.file_uploader("Wgraj zdjęcie", accept_multiple_files=False, type=[
-                                           "png", "jpg"], label_visibility="collapsed")
-    return img_before_cropping
+    return image_picker(key="main_picture")
 
 
 def crop_picture(img_before_cropping):
-    if not img_before_cropping:
+    if img_before_cropping is None:
         return None
 
     st.markdown("---")
@@ -235,7 +233,7 @@ def crop_picture(img_before_cropping):
         if aspect_type is None:
             aspect_type = "Facebook"
 
-    img_high_res = ImageOps.exif_transpose(Image.open(img_before_cropping))
+    img_high_res = img_before_cropping
     MAX_BASE = 1920
     if max(img_high_res.size) > MAX_BASE:
         img_high_res.thumbnail((MAX_BASE, MAX_BASE), Image.LANCZOS)
@@ -491,7 +489,37 @@ def main() -> None:
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
     )
+    st.markdown("""
+            <style>
+            [data-testid="stFileUploader"] button {
+                color: transparent !important;
+                position: relative; 
+            }
+            [data-testid="stFileUploader"] button::after {
+                content: "Wybierz plik";
+                color: #87a428; 
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                font-weight: 400;
+                visibility: visible !important;
+            }
+            [data-testid="stFileUploader"]:has(small) button::after {
+                content: none !important;
+            }
 
+            [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
+                display: none !important;
+            }
+            [data-testid="stFileUploaderDropzoneInstructions"] > div::after {
+                content: "Limit 200MB na plik • PNG, JPG";
+                display: block !important;
+                font-size: 14px;
+                color: rgba(49, 51, 63, 0.6); /* Domyślny szary kolor Streamlit */
+            }
+            </style>
+        """, unsafe_allow_html=True)
     st.markdown("---")
 
     st.subheader("Wgraj zdjęcie")
