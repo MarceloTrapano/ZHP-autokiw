@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-import threading
+import rembg
 from enum import StrEnum
 from pathlib import Path
 
@@ -74,27 +74,8 @@ def is_streamlit_cloud() -> bool:
 
 
 @st.cache_resource
-def warm_up_pipeline():
-    """Jednorazowo na proces: pobiera model, ładuje ONNX, kompiluje numbę."""
-    def _run():
-        try:
-            logger.info("Starting pipeline warm-up...")
-            img = Image.new("RGB", (800, 800), (200, 200, 200))
-            ImageDraw.Draw(img).ellipse(
-                (200, 150, 600, 750), fill=(120, 60, 40))
-            start_the_process(
-                image=img, logo=None, main_text="x", secondary_text="",
-                author="", color=str(ZhpColor.green_base), use_cutout=True,
-                resolution=aspect_ratio_dict["Facebook"][1],
-            )
-            logger.info("Pipeline warm-up finished.")
-        except Exception:
-            logger.exception("Pipeline warm-up failed (non-critical).")
-
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    logger.info("Pipeline warm-up thread started.")
-    return t
+def get_rembg_session():
+    return rembg.new_session("u2netp")
 
 
 @st.cache_resource
@@ -581,7 +562,7 @@ def check(image_file: Image.Image) -> bool:
     return True
 
 
-def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution) -> bytes:
+def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, session) -> bytes:
     logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
                 "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
@@ -592,7 +573,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
         src = tmp / "input.png"
         image.convert("RGB").save(src)
 
-        builder = (AutoKiwBuilder()
+        builder = (AutoKiwBuilder(session)
                    .set_image_path(str(src))
                    .set_main_text(main_text)
                    .set_secondary_text(secondary_text)
@@ -619,9 +600,6 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
             raise
         finally:
             builder.close()
-
-
-warm_up_pipeline()
 
 
 def main() -> None:
@@ -661,6 +639,8 @@ def main() -> None:
             </style>
         """, unsafe_allow_html=True)
     st.markdown("---")
+
+    session = get_rembg_session()
 
     st.subheader("Wgraj zdjęcie")
     img_before_cropping = add_picture()
@@ -731,6 +711,7 @@ def main() -> None:
                             use_cutout=use_cutout,
                             resolution=resolution,
                             logo=logo,
+                            session=session,
                         )
                 except Exception as e:
                     logger.exception("Graphic generation failed.")
