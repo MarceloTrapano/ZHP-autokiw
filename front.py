@@ -18,16 +18,37 @@ from streamlit_javascript import st_javascript
 from src import ZhpColor, AutoKiwBuilder, image_picker
 from src.auto_kiw_builder import svg_to_jpg
 
-FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+_ORANGE = "\033[38;5;208m"
+_RESET = "\033[0m"
+
+LEVEL_EMOJI = {
+    logging.DEBUG: "🔍",
+    logging.INFO: "📦",
+    logging.WARNING: "⚠️",
+    logging.ERROR: "❌",
+    logging.CRITICAL: "💥",
+}
+
+
+class EmojiFormatter(logging.Formatter):
+    def format(self, record):
+        emoji = LEVEL_EMOJI.get(record.levelno, "•")
+        ts = self.formatTime(record, "%H:%M:%S")
+
+        msg = record.getMessage()
+        line = f"[{_ORANGE}{ts}{_RESET}] {emoji} {msg}"
+        if record.exc_info:
+            line += "\n" + self.formatException(record.exc_info)
+        return line
 
 
 def setup_logging() -> logging.Logger:
     root = logging.getLogger()
-    if root.level == logging.NOTSET or root.level > logging.INFO:
+    if root.level == logging.NOTSET or root.level > logging.WARNING:
         root.setLevel(logging.WARNING)
 
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(FORMAT))
+    handler.setFormatter(EmojiFormatter())
 
     for name in ("zhp_autokiw", "src"):
         lg = logging.getLogger(name)
@@ -728,5 +749,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    logger.info("App started. Cloud environment: %s.", is_streamlit_cloud())
     main()
