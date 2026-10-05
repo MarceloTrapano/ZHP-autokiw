@@ -727,5 +727,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    logger.info("App started. Cloud environment: %s.", is_streamlit_cloud())
     main()
