@@ -232,6 +232,8 @@ def crop_picture(img_before_cropping):
         aspect_type = st.pills(
             "Wybierz typ", ["Facebook", "Instagram", "Dowolny"], default="Facebook"
         )
+        if aspect_type is None:
+            aspect_type = "Facebook"
 
     img_high_res = ImageOps.exif_transpose(Image.open(img_before_cropping))
     MAX_BASE = 1920
@@ -349,7 +351,6 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
             font-size: 0;
         }}
         
-        /* Wymuszenie siatki (gridu) dla kafelków na urządzeniach mobilnych */
         @media (max-width: 640px) {{
             div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) {{
                 flex-direction: row !important;
@@ -490,37 +491,7 @@ def main() -> None:
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
     )
-    st.markdown("""
-            <style>
-            [data-testid="stFileUploader"] button {
-                color: transparent !important;
-                position: relative; 
-            }
-            [data-testid="stFileUploader"] button::after {
-                content: "Wybierz plik";
-                color: #87a428; 
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                font-weight: 400;
-                visibility: visible !important;
-            }
-            [data-testid="stFileUploader"]:has(small) button::after {
-                content: none !important;
-            }
 
-            [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
-                display: none !important;
-            }
-            [data-testid="stFileUploaderDropzoneInstructions"] > div::after {
-                content: "Limit 200MB na plik • PNG, JPG";
-                display: block !important;
-                font-size: 14px;
-                color: rgba(49, 51, 63, 0.6); /* Domyślny szary kolor Streamlit */
-            }
-            </style>
-        """, unsafe_allow_html=True)
     st.markdown("---")
 
     st.subheader("Wgraj zdjęcie")
