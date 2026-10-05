@@ -275,7 +275,7 @@ def crop_picture(img_before_cropping):
 
     image_file = img_high_res.crop((left, top, right, bottom))
 
-    if aspect_type == "Custom":
+    if aspect_type == "Dowolny":
         res = scale_resolution(image_file.size)
     else:
         res = aspect_ratio_dict[aspect_type][1]
