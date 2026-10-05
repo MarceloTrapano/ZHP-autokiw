@@ -23,17 +23,18 @@ FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 def setup_logging() -> logging.Logger:
     root = logging.getLogger()
-    if not getattr(root, "_zhp_configured", False):
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter(FORMAT))
-        root.addHandler(handler)
-        root.setLevel(logging.INFO)
-        root._zhp_configured = True
+    if root.level == logging.NOTSET or root.level > logging.INFO:
+        root.setLevel(logging.WARNING)
 
-    for name in ("src", "zhp_autokiw"):
-        mod_logger = logging.getLogger(name)
-        mod_logger.setLevel(logging.INFO)
-        mod_logger.propagate = True
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(FORMAT))
+
+    for name in ("zhp_autokiw", "src"):
+        lg = logging.getLogger(name)
+        lg.setLevel(logging.INFO)
+        lg.propagate = False
+        if not lg.handlers:
+            lg.addHandler(handler)
 
     return logging.getLogger("zhp_autokiw")
 
@@ -727,4 +728,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    logger.info("App started. Cloud environment: %s.", is_streamlit_cloud())
     main()
