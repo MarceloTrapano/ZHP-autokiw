@@ -1,20 +1,50 @@
-import streamlit as st
-from streamlit_cropper import st_cropper
-from enum import StrEnum
-from src import ZhpColor, AutoKiwBuilder
-from PIL import Image, ImageOps
-import tempfile
-from pathlib import Path
-from src import ZhpColor, AutoKiwBuilder, image_picker
-from src.auto_kiw_builder import svg_to_jpg
-from streamlit_javascript import st_javascript
-import subprocess
-import shutil
 import base64
 import io
-import numpy as np
+import logging
+import os
+import shutil
+import subprocess
+import tempfile
 import threading
-from PIL import ImageDraw
+from enum import StrEnum
+from pathlib import Path
+
+import numpy as np
+import streamlit as st
+from PIL import Image, ImageDraw
+from streamlit_cropper import st_cropper
+from streamlit_javascript import st_javascript
+
+from src import ZhpColor, AutoKiwBuilder, image_picker
+from src.auto_kiw_builder import svg_to_jpg
+
+
+FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+
+
+def setup_logging() -> logging.Logger:
+    root = logging.getLogger()
+    if not root.handlers:
+        logging.basicConfig(level=logging.INFO, format=FORMAT)
+
+        root.setLevel(logging.INFO)
+
+    logger = logging.getLogger("zhp_autokiw")
+    logger.setLevel(logging.INFO)
+    return logger
+
+
+logger = setup_logging()
+
+BASE_DIR = Path(__file__).resolve().parent
+ASSETS_DIR = BASE_DIR / "assets"
+
+
+def is_streamlit_cloud() -> bool:
+    """Wykrywa środowisko Streamlit Community Cloud."""
+    return bool(os.environ.get("STREAMLIT_SHARING_MODE")) or bool(
+        os.environ.get("STREAMLIT_SERVER_HEADLESS")
+    ) or "streamlit.app" in (os.environ.get("HOSTNAME") or "")
 
 
 @st.cache_resource
@@ -22,6 +52,7 @@ def warm_up_pipeline():
     """Jednorazowo na proces: pobiera model, ładuje ONNX, kompiluje numbę."""
     def _run():
         try:
+            logger.info("Rozpoczynam rozgrzewkę pipeline'u...")
             img = Image.new("RGB", (800, 800), (200, 200, 200))
             ImageDraw.Draw(img).ellipse(
                 (200, 150, 600, 750), fill=(120, 60, 40))
@@ -30,28 +61,68 @@ def warm_up_pipeline():
                 author="", color=str(ZhpColor.green_base), use_cutout=True,
                 resolution=aspect_ratio_dict["Facebook"][1],
             )
+            logger.info("Rozgrzewka pipeline'u zakończona.")
         except Exception:
-            pass  # rozgrzewka nie może psuć aplikacji
+            # rozgrzewka nie może psuć aplikacji, ale błąd musi być widoczny w logach
+            logger.exception(
+                "Rozgrzewka pipeline'u nie powiodła się (niekrytyczne).")
+
     t = threading.Thread(target=_run, daemon=True)
     t.start()
+    logger.info("Wątek rozgrzewki pipeline'u uruchomiony.")
     return t
 
 
 @st.cache_resource
 def setup_system_fonts():
-    """Kopiuje czcionki z folderu assets/fonts do systemu i odświeża cache."""
+    """Kopiuje czcionki z folderu assets/fonts do systemu i odświeża cache.
+
+    Na Streamlit Community Cloud katalog domowy jest zapisywalny, więc kopiowanie
+    działa, ale `fc-cache` może nie istnieć — wtedy tylko logujemy ostrzeżenie
+    i fallbackiem jest pozostawienie czcionek w katalogu aplikacji (fontconfig
+    skanuje też ~/.fonts przy starcie procesu).
+    """
+    logger.info("Konfiguracja czcionek systemowych...")
     fonts_dest_dir = Path.home() / ".fonts"
+    fonts_source_dir = ASSETS_DIR / "fonts"
 
-    fonts_source_dir = Path("assets/fonts")
+    try:
+        fonts_dest_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        logger.error("Nie można utworzyć katalogu czcionek %s: %s",
+                     fonts_dest_dir, e)
+        if not is_streamlit_cloud():
+            st.error(f"Nie można utworzyć katalogu czcionek: {e}")
+        return
 
-    fonts_dest_dir.mkdir(parents=True, exist_ok=True)
+    if not fonts_source_dir.exists():
+        logger.warning("Nie znaleziono folderu czcionek: %s", fonts_source_dir)
+        if not is_streamlit_cloud():
+            st.warning(f"Nie znaleziono folderu: {fonts_source_dir}")
+        return
 
-    if fonts_source_dir.exists():
-        for font_file in fonts_source_dir.iterdir():
-            if font_file.is_file() and font_file.suffix.lower() in ['.ttf', '.otf']:
+    copied = 0
+    for font_file in fonts_source_dir.iterdir():
+        if font_file.is_file() and font_file.suffix.lower() in ['.ttf', '.otf']:
+            try:
                 shutil.copy(font_file, fonts_dest_dir)
-    else:
-        st.warning(f"Nie znaleziono folderu: {fonts_source_dir}")
+                copied += 1
+            except OSError as e:
+                logger.error("Nie udało się skopiować czcionki %s: %s",
+                             font_file.name, e)
+    logger.info("Skopiowano %d czcionek do %s.", copied, fonts_dest_dir)
+
+    if shutil.which("fc-cache") is None:
+        logger.warning(
+            "Komenda 'fc-cache' niedostępna (brak fontconfig). "
+            "Pomijam odświeżanie cache — czcionki powinny zostać wykryte "
+            "przy kolejnym uruchomieniu procesu."
+        )
+        if not is_streamlit_cloud():
+            st.info(
+                "Nie znaleziono komendy 'fc-cache'. Upewnij się, że pakiet "
+                "'fontconfig' jest zainstalowany (na Streamlit Community Cloud "
+                "można go dodać przez packages.txt).")
         return
 
     try:
@@ -61,19 +132,28 @@ def setup_system_fonts():
             capture_output=True,
             text=True
         )
+        logger.info("Cache czcionek (fc-cache) odświeżony.")
     except subprocess.CalledProcessError as e:
-        st.error(f"Błąd podczas odświeżania cache'u czcionek: {e.stderr}")
-    except FileNotFoundError:
-        st.error(
-            "Nie znaleziono komendy 'fc-cache'. Upewnij się, że pakiet 'fontconfig' jest zainstalowany.")
+        logger.error("Błąd podczas odświeżania cache'u czcionek: %s", e.stderr)
+        if not is_streamlit_cloud():
+            st.error(f"Błąd podczas odświeżania cache'u czcionek: {e.stderr}")
 
+
+try:
+    page_icon = Image.open(ASSETS_DIR / "logo.png")
+except FileNotFoundError:
+    logger.warning("Nie znaleziono assets/logo.png — używam domyślnej ikony.")
+    page_icon = "🖼️"
 
 st.set_page_config(
     page_title="ZHP Autokiw",
-    page_icon=Image.open("assets/logo.png"),
+    page_icon=page_icon,
 )
 setup_system_fonts()
 window_width = st_javascript("window.innerWidth")
+if window_width is None:
+    # st_javascript zwraca None przy pierwszym przebiegu — logujemy raz, traktujemy jak szeroki ekran.
+    logger.debug("window.innerWidth jeszcze niedostępne (pierwszy przebieg).")
 
 
 @st.cache_data
@@ -151,48 +231,48 @@ FOOTER_CSS = f"""
 
 @media (max-width: 600px) {{
     .app-footer {{
-        padding: 8px 12px;       
+        padding: 8px 12px;
         margin-top: 1rem;
-        line-height: 1.2;        
+        line-height: 1.2;
     }}
-    .footer-inner {{ 
-        flex-wrap: nowrap;      
+    .footer-inner {{
+        flex-wrap: nowrap;
         gap: 12px;
     }}
-    .footer-logo {{ 
-        height: 40px;            
-        order: 2;              
+    .footer-logo {{
+        height: 40px;
+        order: 2;
     }}
-    .footer-text {{ 
-        order: 1;              
-        text-align: left;       
-        font-size: 0.65rem;    
+    .footer-text {{
+        order: 1;
+        text-align: left;
+        font-size: 0.65rem;
     }}
-    .footer-text .small {{ 
-        font-size: 0.55rem;  
+    .footer-text .small {{
+        font-size: 0.55rem;
     }}
 }}
 @media (max-height: 750px) {{
     .app-footer {{
-        padding: 8px 12px;       
+        padding: 8px 12px;
         margin-top: 1rem;
-        line-height: 1.2;        
+        line-height: 1.2;
     }}
-    .footer-inner {{ 
-        flex-wrap: nowrap;      
+    .footer-inner {{
+        flex-wrap: nowrap;
         gap: 12px;
     }}
-    .footer-logo {{ 
-        height: 40px;            
-        order: 2;              
+    .footer-logo {{
+        height: 40px;
+        order: 2;
     }}
-    .footer-text {{ 
-        order: 1;              
-        text-align: left;       
-        font-size: 0.65rem;    
+    .footer-text {{
+        order: 1;
+        text-align: left;
+        font-size: 0.65rem;
     }}
-    .footer-text .small {{ 
-        font-size: 0.55rem;  
+    .footer-text .small {{
+        font-size: 0.55rem;
     }}
 }}
 </style>
@@ -208,7 +288,6 @@ FOOTER_FIXED_CSS = """
 
 
 def render_footer(left_logo: str, right_logo: str, fixed: bool = False) -> None:
-    # left = logo_data_uri(left_logo) <img class="footer-logo left" src="{left}" alt="Logo ZHP">
     right = logo_data_uri(right_logo)
     html = f"""
 <div class="app-footer"><div class="footer-inner">
@@ -242,6 +321,9 @@ def add_picture() -> Image.Image:
 def crop_picture(img_before_cropping):
     if img_before_cropping is None:
         return None
+
+    logger.info("Kadrowanie zdjęcia (%dx%d).",
+                img_before_cropping.width, img_before_cropping.height)
 
     st.markdown("---")
 
@@ -302,6 +384,9 @@ def crop_picture(img_before_cropping):
     else:
         res = aspect_ratio_dict[aspect_type][1]
 
+    logger.info("Wybrano typ kadru: %s, rozdzielczość docelowa: %s.",
+                aspect_type, res)
+
     st.write("Podgląd:")
     preview = image_file.copy()
     preview.thumbnail((150, 150))
@@ -334,10 +419,7 @@ def _set_hex(hex_key: str, value: str) -> None:
 def choose_color(options: type[StrEnum], *, columns: int = 6,
                  key_prefix: str = "color",
                  default_hex: str | None = None) -> str:
-    """Kafelki z palety plus klikalny podgląd wybranego koloru (color picker).
-
-    Zwraca (etykieta, hex).
-    """
+    """Kafelki z palety plus klikalny podgląd wybranego koloru (color picker)."""
     st.text("Kliknij kafelek z palety albo podgląd koloru poniżej, aby wybrać własny.")
     hex_key = f"{key_prefix}_hex"
     preview_key = f"{key_prefix}_preview"
@@ -370,7 +452,7 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
         div[data-testid="stVerticalBlockBorderWrapper"] button p {{
             font-size: 0;
         }}
-        
+
         @media (max-width: 640px) {{
             div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) {{
                 flex-direction: row !important;
@@ -477,6 +559,11 @@ def check(image_file: Image.Image) -> bool:
 
 
 def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution) -> bytes:
+    logger.info("Generowanie grafiki: resolution=%s, color=%s, cutout=%s, "
+                "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
+                resolution, color, use_cutout, main_text, secondary_text,
+                author, "tak" if logo is not None else "nie")
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         src = tmp / "input.png"
@@ -501,7 +588,12 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
 
             out = tmp / "out.jpg"
             svg_to_jpg(builder.output_path, str(out), size=builder.canvas_size)
+            logger.info("Grafika wygenerowana pomyślnie (%d bajtów).",
+                        out.stat().st_size)
             return out.read_bytes()
+        except Exception:
+            logger.exception("Błąd podczas generowania grafiki.")
+            raise
         finally:
             builder.close()
 
@@ -518,11 +610,11 @@ def main() -> None:
             <style>
             [data-testid="stFileUploader"] button {
                 color: transparent !important;
-                position: relative; 
+                position: relative;
             }
             [data-testid="stFileUploader"] button::after {
                 content: "Wybierz plik";
-                color: #87a428; 
+                color: #87a428;
                 position: absolute;
                 left: 50%;
                 top: 50%;
@@ -566,7 +658,7 @@ def main() -> None:
         st.markdown("---")
 
         st.subheader("Wybierz kolor")
-        if window_width > 600:
+        if window_width and window_width > 600:
             selected_hex = choose_color(
                 ZhpColor, columns=6, default_hex=ZhpColor.green_base
             )
@@ -601,6 +693,7 @@ def main() -> None:
         if st.session_state.is_running:
             if not check(image_file):
                 st.session_state.error = "Uzupełnij zdjęcie."
+                logger.warning("Próba generowania bez wgranego zdjęcia.")
             else:
                 st.session_state.error = None
                 try:
@@ -616,6 +709,7 @@ def main() -> None:
                             logo=logo,
                         )
                 except Exception as e:
+                    logger.exception("Nie udało się wygenerować grafiki.")
                     st.session_state.error = f"Nie udało się wygenerować grafiki: {e}"
                 finally:
                     st.session_state.is_running = False
@@ -637,4 +731,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    logger.info("Start aplikacji. Środowisko cloud: %s.", is_streamlit_cloud())
     main()
