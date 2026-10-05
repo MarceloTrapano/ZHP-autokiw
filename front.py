@@ -18,7 +18,6 @@ from streamlit_javascript import st_javascript
 from src import ZhpColor, AutoKiwBuilder, image_picker
 from src.auto_kiw_builder import svg_to_jpg
 
-
 FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 
@@ -26,7 +25,6 @@ def setup_logging() -> logging.Logger:
     root = logging.getLogger()
     if not root.handlers:
         logging.basicConfig(level=logging.INFO, format=FORMAT)
-
         root.setLevel(logging.INFO)
 
     logger = logging.getLogger("zhp_autokiw")
@@ -52,7 +50,7 @@ def warm_up_pipeline():
     """Jednorazowo na proces: pobiera model, ładuje ONNX, kompiluje numbę."""
     def _run():
         try:
-            logger.info("Rozpoczynam rozgrzewkę pipeline'u...")
+            logger.info("Starting pipeline warm-up...")
             img = Image.new("RGB", (800, 800), (200, 200, 200))
             ImageDraw.Draw(img).ellipse(
                 (200, 150, 600, 750), fill=(120, 60, 40))
@@ -61,42 +59,34 @@ def warm_up_pipeline():
                 author="", color=str(ZhpColor.green_base), use_cutout=True,
                 resolution=aspect_ratio_dict["Facebook"][1],
             )
-            logger.info("Rozgrzewka pipeline'u zakończona.")
+            logger.info("Pipeline warm-up finished.")
         except Exception:
-            # rozgrzewka nie może psuć aplikacji, ale błąd musi być widoczny w logach
-            logger.exception(
-                "Rozgrzewka pipeline'u nie powiodła się (niekrytyczne).")
+            logger.exception("Pipeline warm-up failed (non-critical).")
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
-    logger.info("Wątek rozgrzewki pipeline'u uruchomiony.")
+    logger.info("Pipeline warm-up thread started.")
     return t
 
 
 @st.cache_resource
 def setup_system_fonts():
-    """Kopiuje czcionki z folderu assets/fonts do systemu i odświeża cache.
-
-    Na Streamlit Community Cloud katalog domowy jest zapisywalny, więc kopiowanie
-    działa, ale `fc-cache` może nie istnieć — wtedy tylko logujemy ostrzeżenie
-    i fallbackiem jest pozostawienie czcionek w katalogu aplikacji (fontconfig
-    skanuje też ~/.fonts przy starcie procesu).
-    """
-    logger.info("Konfiguracja czcionek systemowych...")
+    """Kopiuje czcionki z folderu assets/fonts do systemu i odświeża cache."""
+    logger.info("Setting up system fonts...")
     fonts_dest_dir = Path.home() / ".fonts"
     fonts_source_dir = ASSETS_DIR / "fonts"
 
     try:
         fonts_dest_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        logger.error("Nie można utworzyć katalogu czcionek %s: %s",
+        logger.error("Cannot create fonts directory %s: %s",
                      fonts_dest_dir, e)
         if not is_streamlit_cloud():
             st.error(f"Nie można utworzyć katalogu czcionek: {e}")
         return
 
     if not fonts_source_dir.exists():
-        logger.warning("Nie znaleziono folderu czcionek: %s", fonts_source_dir)
+        logger.warning("Fonts folder not found: %s", fonts_source_dir)
         if not is_streamlit_cloud():
             st.warning(f"Nie znaleziono folderu: {fonts_source_dir}")
         return
@@ -108,15 +98,15 @@ def setup_system_fonts():
                 shutil.copy(font_file, fonts_dest_dir)
                 copied += 1
             except OSError as e:
-                logger.error("Nie udało się skopiować czcionki %s: %s",
+                logger.error("Failed to copy font %s: %s",
                              font_file.name, e)
-    logger.info("Skopiowano %d czcionek do %s.", copied, fonts_dest_dir)
+    logger.info("Copied %d fonts to %s.", copied, fonts_dest_dir)
 
     if shutil.which("fc-cache") is None:
         logger.warning(
-            "Komenda 'fc-cache' niedostępna (brak fontconfig). "
-            "Pomijam odświeżanie cache — czcionki powinny zostać wykryte "
-            "przy kolejnym uruchomieniu procesu."
+            "'fc-cache' command not available (fontconfig missing). "
+            "Skipping cache refresh — fonts should be detected on the "
+            "next process start."
         )
         if not is_streamlit_cloud():
             st.info(
@@ -132,9 +122,9 @@ def setup_system_fonts():
             capture_output=True,
             text=True
         )
-        logger.info("Cache czcionek (fc-cache) odświeżony.")
+        logger.info("Font cache (fc-cache) refreshed.")
     except subprocess.CalledProcessError as e:
-        logger.error("Błąd podczas odświeżania cache'u czcionek: %s", e.stderr)
+        logger.error("Error refreshing font cache: %s", e.stderr)
         if not is_streamlit_cloud():
             st.error(f"Błąd podczas odświeżania cache'u czcionek: {e.stderr}")
 
@@ -142,7 +132,7 @@ def setup_system_fonts():
 try:
     page_icon = Image.open(ASSETS_DIR / "logo.png")
 except FileNotFoundError:
-    logger.warning("Nie znaleziono assets/logo.png — używam domyślnej ikony.")
+    logger.warning("assets/logo.png not found — using default page icon.")
     page_icon = "🖼️"
 
 st.set_page_config(
@@ -152,8 +142,7 @@ st.set_page_config(
 setup_system_fonts()
 window_width = st_javascript("window.innerWidth")
 if window_width is None:
-    # st_javascript zwraca None przy pierwszym przebiegu — logujemy raz, traktujemy jak szeroki ekran.
-    logger.debug("window.innerWidth jeszcze niedostępne (pierwszy przebieg).")
+    logger.debug("window.innerWidth not available yet (first pass).")
 
 
 @st.cache_data
@@ -322,7 +311,7 @@ def crop_picture(img_before_cropping):
     if img_before_cropping is None:
         return None
 
-    logger.info("Kadrowanie zdjęcia (%dx%d).",
+    logger.info("Cropping image (%dx%d).",
                 img_before_cropping.width, img_before_cropping.height)
 
     st.markdown("---")
@@ -384,7 +373,7 @@ def crop_picture(img_before_cropping):
     else:
         res = aspect_ratio_dict[aspect_type][1]
 
-    logger.info("Wybrano typ kadru: %s, rozdzielczość docelowa: %s.",
+    logger.info("Selected crop type: %s, target resolution: %s.",
                 aspect_type, res)
 
     st.write("Podgląd:")
@@ -559,7 +548,7 @@ def check(image_file: Image.Image) -> bool:
 
 
 def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution) -> bytes:
-    logger.info("Generowanie grafiki: resolution=%s, color=%s, cutout=%s, "
+    logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
                 "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
                 author, "tak" if logo is not None else "nie")
@@ -588,11 +577,11 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
 
             out = tmp / "out.jpg"
             svg_to_jpg(builder.output_path, str(out), size=builder.canvas_size)
-            logger.info("Grafika wygenerowana pomyślnie (%d bajtów).",
+            logger.info("Graphic generated successfully (%d bytes).",
                         out.stat().st_size)
             return out.read_bytes()
         except Exception:
-            logger.exception("Błąd podczas generowania grafiki.")
+            logger.exception("Error while generating graphic.")
             raise
         finally:
             builder.close()
@@ -693,7 +682,8 @@ def main() -> None:
         if st.session_state.is_running:
             if not check(image_file):
                 st.session_state.error = "Uzupełnij zdjęcie."
-                logger.warning("Próba generowania bez wgranego zdjęcia.")
+                logger.warning(
+                    "Generation attempted without an uploaded image.")
             else:
                 st.session_state.error = None
                 try:
@@ -709,7 +699,7 @@ def main() -> None:
                             logo=logo,
                         )
                 except Exception as e:
-                    logger.exception("Nie udało się wygenerować grafiki.")
+                    logger.exception("Graphic generation failed.")
                     st.session_state.error = f"Nie udało się wygenerować grafiki: {e}"
                 finally:
                     st.session_state.is_running = False
@@ -731,5 +721,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    logger.info("Start aplikacji. Środowisko cloud: %s.", is_streamlit_cloud())
+    logger.info("App started. Cloud environment: %s.", is_streamlit_cloud())
     main()
