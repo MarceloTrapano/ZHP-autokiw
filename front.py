@@ -339,8 +339,11 @@ def crop_picture(img_before_cropping):
     if img_before_cropping is None:
         return None
 
-    logger.info("Cropping image (%dx%d).",
-                img_before_cropping.width, img_before_cropping.height)
+    prev = st.session_state.get("_last_crop_img_size")
+    if prev != img_before_cropping.size:
+        st.session_state["_last_crop_img_size"] = img_before_cropping.size
+        logger.info("Cropping image (%dx%d).",
+                    img_before_cropping.width, img_before_cropping.height)
 
     st.markdown("---")
 
@@ -401,8 +404,11 @@ def crop_picture(img_before_cropping):
     else:
         res = aspect_ratio_dict[aspect_type][1]
 
-    logger.info("Selected crop type: %s, target resolution: %s.",
-                aspect_type, res)
+    prev_type = st.session_state.get("_last_crop_type")
+    if prev_type != (aspect_type, tuple(res)):
+        st.session_state["_last_crop_type"] = (aspect_type, tuple(res))
+        logger.info("Selected crop type: %s, target resolution: %s.",
+                    aspect_type, res)
 
     st.write("Podgląd:")
     preview = image_file.copy()
