@@ -601,6 +601,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
             raise
         finally:
             builder.close()
+            logger.debug("Removed temporary folder: %s", tmp)
 
 
 def main() -> None:
