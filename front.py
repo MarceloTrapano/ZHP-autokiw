@@ -6,8 +6,9 @@ import shutil
 import subprocess
 import tempfile
 import rembg
+import threading
+from concurrent.futures import Future
 from enum import StrEnum
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -76,20 +77,27 @@ def is_streamlit_cloud() -> bool:
 
 @st.cache_resource
 def get_rembg_session():
-    executor = ThreadPoolExecutor(max_workers=1)
+    future = Future()
 
     def _init_and_warmup():
-        logger.info(
-            "Starting background model download and initialization...")
-        session = rembg.new_session("u2netp")
+        try:
+            logging.info(
+                "Starting background model download and initialization...")
+            session = rembg.new_session("u2netp")
 
-        dummy_img = Image.new("RGB", (64, 64), (200, 200, 200))
-        rembg.remove(dummy_img, session=session)
+            dummy_img = Image.new("RGB", (64, 64), (200, 200, 200))
+            rembg.remove(dummy_img, session=session)
 
-        logger.info("Model loaded and warmed up!")
-        return session
+            logging.info("Model loaded and warmed up!")
+            future.set_result(session)
+        except Exception as e:
+            logging.error(f"Warmup failed: {e}")
+            future.set_exception(e)
 
-    return executor.submit(_init_and_warmup)
+    t = threading.Thread(target=_init_and_warmup, daemon=True)
+    t.start()
+
+    return future
 
 
 @st.cache_resource
@@ -654,7 +662,7 @@ def main() -> None:
         """, unsafe_allow_html=True)
     st.markdown("---")
 
-    session = get_rembg_session()
+    session_future = get_rembg_session()
 
     st.subheader("Wgraj zdjęcie")
     img_before_cropping = add_picture()
@@ -716,6 +724,7 @@ def main() -> None:
                 st.session_state.error = None
                 try:
                     with st.spinner("Trwa generowanie, proszę czekać...", show_time=True):
+                        session = session_future.result()
                         st.session_state.result = start_the_process(
                             image=image_file,
                             main_text=main_text,
