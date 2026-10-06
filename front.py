@@ -1,6 +1,5 @@
 import base64
 import io
-import logging
 import os
 import shutil
 import subprocess
@@ -15,65 +14,22 @@ from PIL import Image
 from streamlit_cropper import st_cropper
 from streamlit_javascript import st_javascript
 
-from src import ZhpColor, AutoKiwBuilder, image_picker
+from src import ZhpColor, AutoKiwBuilder, setup_logging
+from ui import image_picker, inject_css, render_asset, read_asset
 from src.auto_kiw_builder import svg_to_jpg
 
-_ORANGE = "\033[38;5;208m"
-_RESET = "\033[0m"
-
-LEVEL_EMOJI = {
-    logging.DEBUG: "🔍",
-    logging.INFO: "📦",
-    logging.WARNING: "⚠️",
-    logging.ERROR: "❌",
-    logging.CRITICAL: "💥",
-}
+MOBILE_BREAKPOINT = 600
 
 if 'session_id' not in st.session_state:
     st.session_state.session_id = uuid.uuid4().hex[:4]
 
-
-class EmojiFormatter(logging.Formatter):
-    def format(self, record):
-        emoji = LEVEL_EMOJI.get(record.levelno, "•")
-        ts = self.formatTime(record, "%H:%M:%S")
-        name = record.name
-        msg = record.getMessage()
-        line = f"[{_ORANGE}{ts}{_RESET}] {emoji} [{name}] {msg} [session: {st.session_state.session_id}]"
-        if record.exc_info:
-            line += "\n" + self.formatException(record.exc_info)
-        return line
-
-
-def setup_logging() -> logging.Logger:
-    log_level_str = os.getenv("STREAMLIT_LOGGER_LEVEL", "INFO").upper()
-    numeric_level = getattr(logging, log_level_str, logging.INFO)
-
-    root = logging.getLogger()
-    if root.level == logging.NOTSET or root.level > logging.WARNING:
-        root.setLevel(logging.WARNING)
-
-    handler = logging.StreamHandler()
-    handler.setFormatter(EmojiFormatter())
-
-    for name in ("zhp_autokiw", "src"):
-        lg = logging.getLogger(name)
-        lg.setLevel(numeric_level)
-        lg.propagate = False
-        if not lg.handlers:
-            lg.addHandler(handler)
-
-    return logging.getLogger("zhp_autokiw")
-
-
-logger = setup_logging()
+logger = setup_logging(st.session_state.session_id)
 
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
 
 
 def is_streamlit_cloud() -> bool:
-    """Wykrywa środowisko Streamlit Community Cloud."""
     return bool(os.environ.get("STREAMLIT_SHARING_MODE")) or bool(
         os.environ.get("STREAMLIT_SERVER_HEADLESS")
     ) or "streamlit.app" in (os.environ.get("HOSTNAME") or "")
@@ -81,7 +37,6 @@ def is_streamlit_cloud() -> bool:
 
 @st.cache_resource
 def setup_system_fonts():
-    """Kopiuje czcionki z folderu assets/fonts do systemu i odświeża cache."""
     logger.info("Setting up system fonts...")
     fonts_dest_dir = Path.home() / ".fonts"
     fonts_source_dir = ASSETS_DIR / "fonts"
@@ -149,8 +104,11 @@ st.set_page_config(
     page_title="ZHP Autokiw",
     page_icon=page_icon,
 )
+
 setup_system_fonts()
+
 window_width = st_javascript("window.innerWidth")
+
 if window_width is None:
     logger.debug("window.innerWidth not available yet (first pass).")
 
@@ -191,117 +149,21 @@ def scale_resolution(res, base=1200):
     return result
 
 
-FOOTER_CSS = f"""
-<style>
-[data-testid="stMain"],
-[data-testid="stMainBlockContainer"],
-.block-container {{
-    padding-bottom: 0 !important;
-    margin-bottom: 0 !important;
-}}
-[data-testid="stBottom"] {{ display: none; }}
-[data-testid="stAppViewContainer"] {{ overflow-x: hidden; }}
+def render_footer(logo_path: Path, fixed: bool = False) -> None:
+    css = render_asset(
+        "css/footer.css",
+        green=ZhpColor.green_base,
+        breakpoint=f"{MOBILE_BREAKPOINT}px",
+        compact=read_asset("css/footer_compact.css"),
+    )
+    if fixed:
+        css += read_asset("css/footer_fixed.css")
 
-.app-footer {{
-    position: relative;
-    left: 50%;
-    margin-left: -50vw;
-    width: 100vw;
-    box-sizing: border-box;
-    margin-top: 4rem;
-    padding: 32px 32px 36px;
-    background-color: {ZhpColor.green_base};
-    color: #ffffff;
-    font-size: 0.9rem;
-    line-height: 1.6;
-}}
-.footer-inner {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    max-width: 1100px;
-    margin: 0 auto;
-}}
-.footer-logo {{ height: 80px; width: auto; }}
-.footer-text {{ flex: 1; text-align: center; }}
-.footer-text a {{ color: #ffffff; text-decoration: underline; }}
-.footer-text .small {{ opacity: 0.75; font-size: 0.8rem; }}
-
-@media (max-width: 600px) {{
-    .app-footer {{
-        padding: 8px 12px;
-        margin-top: 1rem;
-        line-height: 1.2;
-    }}
-    .footer-inner {{
-        flex-wrap: nowrap;
-        gap: 12px;
-    }}
-    .footer-logo {{
-        height: 40px;
-        order: 2;
-    }}
-    .footer-text {{
-        order: 1;
-        text-align: left;
-        font-size: 0.65rem;
-    }}
-    .footer-text .small {{
-        font-size: 0.55rem;
-    }}
-}}
-@media (max-height: 750px) {{
-    .app-footer {{
-        padding: 8px 12px;
-        margin-top: 1rem;
-        line-height: 1.2;
-    }}
-    .footer-inner {{
-        flex-wrap: nowrap;
-        gap: 12px;
-    }}
-    .footer-logo {{
-        height: 40px;
-        order: 2;
-    }}
-    .footer-text {{
-        order: 1;
-        text-align: left;
-        font-size: 0.65rem;
-    }}
-    .footer-text .small {{
-        font-size: 0.55rem;
-    }}
-}}
-</style>
-"""
-
-FOOTER_FIXED_CSS = """
-<style>
-.app-footer { position: fixed !important; left: 0 !important;
-              bottom: 0 !important; margin: 0 !important;
-              width: 100vw !important; z-index: 999; }
-</style>
-"""
-
-
-def render_footer(left_logo: str, right_logo: str, fixed: bool = False) -> None:
-    right = logo_data_uri(right_logo)
-    html = f"""
-<div class="app-footer"><div class="footer-inner">
-<div class="footer-text">
-<div><strong>Aplikacja do obróbki zdjęć zgodnie z KIW ZHP</strong></div>
-<div>© 2026 Kacper Dąbrowski · <a href="mailto:dabrowski.kacper@zhp.net.pl">Kontakt</a></div>
-<div class="small">Zdjęcia nie są zapisywane na serwerze.</div>
-<div class="small">Aplikacja jest nieoficjalna i niezatwierdzona przez ZHP.  </div>
-<div class="small">Jeśli Ci się spodobała to możesz postawić symboliczną kawkę (lepiej herbate) · <a href="mailto:kontakt@example.com">Postaw kawke</a> </div>
-</div>
-<img class="footer-logo right" src="{right}" alt="Logo drużyny">
-</div></div>
-"""
-    css = FOOTER_CSS + (FOOTER_FIXED_CSS if fixed else "")
-    st.markdown(css + html, unsafe_allow_html=True)
+    html = render_asset(
+        "html/footer.html",
+        logo_uri=logo_data_uri(str(logo_path)),
+    )
+    st.markdown(f"<style>{css}</style>{html}", unsafe_allow_html=True)
 
 
 if "is_running" not in st.session_state:
@@ -310,11 +172,6 @@ if "is_running" not in st.session_state:
 
 def lock_button():
     st.session_state.is_running = True
-
-
-def add_picture() -> Image.Image:
-    """Pozwala użytkownikowi wgrać zdjęcie do przerobienia"""
-    return image_picker(key="main_picture")
 
 
 def crop_picture(img_before_cropping):
@@ -351,19 +208,7 @@ def crop_picture(img_before_cropping):
     img_preview.thumbnail((preview_max, preview_max), Image.LANCZOS)
     disp_w = img_preview.width
 
-    st.markdown(
-        f"""
-        <style>
-        iframe[title="streamlit_cropper.st_cropper"] {{
-            display: block;
-            margin: 0 auto;
-            width: {disp_w}px !important;
-            max-width: 100vw !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    inject_css("cropper", width=disp_w)
 
     if aspect_type == "Dowolny":
         box = st_cropper(img_preview, box_color="#000000",
@@ -401,20 +246,11 @@ def crop_picture(img_before_cropping):
 
 
 def get_title_and_subtitle() -> list[str, str]:
-    """Pobranie od użytkownika tytułu zdjęcia oraz opcjonalnie podtytułu"""
     main_text = st.text_input("Wpisz tytuł zdjęcia", max_chars=45)
     secondary_text = ""
     if st.checkbox("Dodaj podtytuł"):
         secondary_text = st.text_input("Wpisz podtytuł", max_chars=45)
     return [main_text, secondary_text]
-
-
-def add_author() -> str:
-    """Pobranie od użytkownika imienia i nazwiska autora zdjęcia (opcjonalne)"""
-    author = ""
-    if st.checkbox("Dodaj autora"):
-        author = st.text_input("Wpisz imię i nazwisko autora zdjęcia")
-    return author
 
 
 def _set_hex(hex_key: str, value: str) -> None:
@@ -424,7 +260,6 @@ def _set_hex(hex_key: str, value: str) -> None:
 def choose_color(options: type[StrEnum], *, columns: int = 6,
                  key_prefix: str = "color",
                  default_hex: str | None = None) -> str:
-    """Kafelki z palety plus klikalny podgląd wybranego koloru (color picker)."""
     st.text("Kliknij kafelek z palety albo podgląd koloru poniżej, aby wybrać własny.")
     hex_key = f"{key_prefix}_hex"
     preview_key = f"{key_prefix}_preview"
@@ -436,74 +271,9 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
     current_name = next(
         (c.name for c in items if str(c.value).lower() == current.lower()), None
     )
+    inject_css("color_palette", key_prefix=key_prefix, columns=columns)
 
-    st.markdown(
-        f"""
-        <style>
-        div[data-testid="stVerticalBlockBorderWrapper"] button {{
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            border: 2px solid rgba(0,0,0,0.15);
-            border-radius: 10px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            transition: transform 0.08s ease-in-out;
-            padding: 0 !important;
-        }}
-        div[data-testid="stVerticalBlockBorderWrapper"] button:hover {{
-            transform: scale(1.05);
-            border-color: rgba(0,0,0,0.4);
-        }}
-        div[data-testid="stVerticalBlockBorderWrapper"] button p {{
-            font-size: 0;
-        }}
-
-        @media (max-width: 640px) {{
-            div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) {{
-                flex-direction: row !important;
-                flex-wrap: wrap !important;
-                gap: 8px !important;
-            }}
-            div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) > div[data-testid="stColumn"],
-            div[data-testid="stHorizontalBlock"]:has([class*="st-key-{key_prefix}_tile"]) > div[data-testid="column"] {{
-                width: calc((100% / {columns}) - 8px) !important;
-                min-width: calc((100% / {columns}) - 8px) !important;
-                flex: 1 1 auto !important;
-                padding: 0 !important;
-            }}
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
-        <style>
-        .st-key-{preview_key} {{
-            position: relative;
-            display: block;
-            flex: None !important;
-            width: 120px !important;
-            height: 60px !important;
-            min-height: 60px !important;
-            background-color: {current} !important;
-            border: 1px solid #ccc !important;
-            border-radius: 8px !important;
-        }}
-        .st-key-{preview_key} div {{
-            position: absolute;
-            inset: 0;
-            width: 100% !important;
-            height: 100% !important;
-            min-width: 0 !important;
-            opacity: 0;
-            cursor: pointer;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    inject_css("color_preview", preview_key=preview_key, current=current)
 
     rows = [items[i: i + columns] for i in range(0, len(items), columns)]
     for row in rows:
@@ -515,17 +285,8 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
                 border = ("4px solid #1a1a1a" if is_selected
                           else "2px solid rgba(0,0,0,0.15)")
                 with st.container(key=tile_key):
-                    st.markdown(
-                        f"""
-                        <style>
-                        .st-key-{tile_key} button {{
-                            background-color: {color.value} !important;
-                            border: {border} !important;
-                        }}
-                        </style>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                    inject_css("color_tile", tile_key=tile_key,
+                               border=border, color=color.value)
                     st.button(
                         " ",
                         key=f"{tile_key}_btn",
@@ -548,12 +309,6 @@ def choose_color(options: type[StrEnum], *, columns: int = 6,
             f'<i style="color:grey; font-size: 1rem;">{label}</i>', unsafe_allow_html=True)
 
     return current
-
-
-def ask_to_use_ai() -> bool:
-    """Zapytanie użytkownika, czy chce wykorzystać sztuczną inteligencję do wycięcia ramki"""
-    use_cutout = st.checkbox("Użyj SI do wycięcia ramki")
-    return use_cutout
 
 
 def check(image_file: Image.Image) -> bool:
@@ -601,7 +356,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
             raise
         finally:
             builder.close()
-            logger.debug("Removed temporary folder: %s", tmp)
+            logger.debug("Removed temporary: %s", tmp)
 
 
 def main() -> None:
@@ -609,41 +364,11 @@ def main() -> None:
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
     )
-    st.markdown("""
-            <style>
-            [data-testid="stFileUploader"] button {
-                color: transparent !important;
-                position: relative;
-            }
-            [data-testid="stFileUploader"] button::after {
-                content: "Wybierz plik";
-                color: #87a428;
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                font-weight: 400;
-                visibility: visible !important;
-            }
-            [data-testid="stFileUploader"]:has(small) button::after {
-                content: none !important;
-            }
 
-            [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
-                display: none !important;
-            }
-            [data-testid="stFileUploaderDropzoneInstructions"] > div::after {
-                content: "Limit 200MB na plik • PNG, JPG";
-                display: block !important;
-                font-size: 14px;
-                color: rgba(49, 51, 63, 0.6); /* Domyślny szary kolor Streamlit */
-            }
-            </style>
-        """, unsafe_allow_html=True)
     st.markdown("---")
 
     st.subheader("Wgraj zdjęcie")
-    img_before_cropping = add_picture()
+    img_before_cropping = image_picker(key="main_picture")
 
     if img_before_cropping is not None:
         image_file, resolution = crop_picture(img_before_cropping)
@@ -656,7 +381,10 @@ def main() -> None:
         st.markdown("---")
 
         st.subheader("Dodaj autora zdjęcia")
-        author = add_author()
+
+        author = ""
+        if st.checkbox("Dodaj autora"):
+            author = st.text_input("Wpisz imię i nazwisko autora zdjęcia")
 
         st.markdown("---")
 
@@ -673,7 +401,7 @@ def main() -> None:
         st.markdown("---")
 
         st.subheader("Czy chcesz wyciąć ramkę?")
-        use_cutout = ask_to_use_ai()
+        use_cutout = st.checkbox("Użyj SI do wycięcia ramki")
 
         st.markdown("---")
 
@@ -730,8 +458,7 @@ def main() -> None:
 
     st.space("xxlarge")
     st.space("xxlarge")
-    render_footer("",
-                  "assets/logo.png", fixed=img_before_cropping is None)
+    render_footer("assets/logo.png", fixed=img_before_cropping is None)
 
 
 if __name__ == "__main__":
