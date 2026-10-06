@@ -76,25 +76,26 @@ def is_streamlit_cloud() -> bool:
 
 
 @st.cache_resource
-def get_rembg_session():
+def get_rembg_session_future():
     future = Future()
 
     def _init_and_warmup():
         try:
-            logging.info(
+            logger.info(
                 "Starting background model download and initialization...")
             session = rembg.new_session("u2netp")
 
             dummy_img = Image.new("RGB", (64, 64), (200, 200, 200))
             rembg.remove(dummy_img, session=session)
 
-            logging.info("Model loaded and warmed up!")
+            logger.info("Model loaded and warmed up!")
             future.set_result(session)
         except Exception as e:
-            logging.error(f"Warmup failed: {e}")
+            logger.error(f"Warmup failed: {e}")
             future.set_exception(e)
 
-    t = threading.Thread(target=_init_and_warmup, daemon=True)
+    t = threading.Timer(2.0, _init_and_warmup)
+    t.daemon = True
     t.start()
 
     return future
