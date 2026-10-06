@@ -46,6 +46,9 @@ class EmojiFormatter(logging.Formatter):
 
 
 def setup_logging() -> logging.Logger:
+    log_level_str = os.getenv("STREAMLIT_LOGGER_LEVEL", "INFO").upper()
+    numeric_level = getattr(logging, log_level_str, logging.INFO)
+
     root = logging.getLogger()
     if root.level == logging.NOTSET or root.level > logging.WARNING:
         root.setLevel(logging.WARNING)
@@ -55,7 +58,7 @@ def setup_logging() -> logging.Logger:
 
     for name in ("zhp_autokiw", "src"):
         lg = logging.getLogger(name)
-        lg.setLevel(logging.INFO)
+        lg.setLevel(numeric_level)
         lg.propagate = False
         if not lg.handlers:
             lg.addHandler(handler)
