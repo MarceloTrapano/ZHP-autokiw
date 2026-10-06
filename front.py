@@ -619,6 +619,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
 
 
 def main() -> None:
+    session = get_rembg_session()
     st.markdown(
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
@@ -716,7 +717,6 @@ def main() -> None:
                 st.session_state.error = None
                 try:
                     with st.spinner("Trwa generowanie, proszę czekać...", show_time=True):
-                        session = get_rembg_session()
                         st.session_state.result = start_the_process(
                             image=image_file,
                             main_text=main_text,
