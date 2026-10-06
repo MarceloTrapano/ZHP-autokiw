@@ -6,8 +6,6 @@ import shutil
 import subprocess
 import tempfile
 import rembg
-import threading
-from concurrent.futures import Future
 from enum import StrEnum
 from pathlib import Path
 
@@ -77,28 +75,23 @@ def is_streamlit_cloud() -> bool:
 
 @st.cache_resource
 def get_rembg_session():
-    future = Future()
+    home_dir = os.path.expanduser("~")
+    dest_dir = os.path.join(home_dir, ".rembg", "models", "u2netp")
+    dest_path = os.path.join(dest_dir, "u2netp.onnx")
 
-    def _init_and_warmup():
-        try:
-            logger.info(
-                "Starting background model download and initialization...")
-            session = rembg.new_session("u2netp")
+    if not os.path.exists(dest_path):
+        logger.info("Copying u2netp.onnx model from repository to cache...")
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.copy("models/u2netp.onnx", dest_path)
 
-            dummy_img = Image.new("RGB", (64, 64), (200, 200, 200))
-            rembg.remove(dummy_img, session=session)
+    logger.info("Initializing rembg session...")
+    session = rembg.new_session("u2netp")
 
-            logger.info("Model loaded and warmed up!")
-            future.set_result(session)
-        except Exception as e:
-            logger.error(f"Warmup failed: {e}")
-            future.set_exception(e)
+    dummy_img = Image.new("RGB", (64, 64), (200, 200, 200))
+    rembg.remove(dummy_img, session=session)
 
-    t = threading.Timer(2.0, _init_and_warmup)
-    t.daemon = True
-    t.start()
-
-    return future
+    logger.info("Model loaded and ready!")
+    return session
 
 
 @st.cache_resource
@@ -663,7 +656,7 @@ def main() -> None:
         """, unsafe_allow_html=True)
     st.markdown("---")
 
-    session_future = get_rembg_session()
+    session = get_rembg_session()
 
     st.subheader("Wgraj zdjęcie")
     img_before_cropping = add_picture()
@@ -725,7 +718,6 @@ def main() -> None:
                 st.session_state.error = None
                 try:
                     with st.spinner("Trwa generowanie, proszę czekać...", show_time=True):
-                        session = session_future.result()
                         st.session_state.result = start_the_process(
                             image=image_file,
                             main_text=main_text,
