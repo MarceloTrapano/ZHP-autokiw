@@ -1,0 +1,20 @@
+.st-key-${preview_key} {
+    position: relative;
+    display: block;
+    flex: None !important;
+    width: 120px !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    background-color: ${current} !important;
+    border: 1px solid #ccc !important;
+    border-radius: 8px !important;
+}
+.st-key-${preview_key} div {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    opacity: 0;
+    cursor: pointer;
+}
