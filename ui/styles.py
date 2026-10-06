@@ -4,7 +4,9 @@ from string import Template
 
 import streamlit as st
 
+
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+BASE_DIR = Path(__file__).resolve().parent
 
 
 @lru_cache(maxsize=None)
