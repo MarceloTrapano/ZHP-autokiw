@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from enum import StrEnum
 from pathlib import Path
 
@@ -28,6 +29,9 @@ LEVEL_EMOJI = {
     logging.CRITICAL: "💥",
 }
 
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = uuid.uuid4().hex[:4]
+
 
 class EmojiFormatter(logging.Formatter):
     def format(self, record):
@@ -35,7 +39,7 @@ class EmojiFormatter(logging.Formatter):
         ts = self.formatTime(record, "%H:%M:%S")
         name = record.name
         msg = record.getMessage()
-        line = f"[{_ORANGE}{ts}{_RESET}] {emoji} [{name}] {msg}"
+        line = f"[{_ORANGE}{ts}{_RESET}] {emoji} [{name}] {msg} [session: {st.session_state.session_id}]"
         if record.exc_info:
             line += "\n" + self.formatException(record.exc_info)
         return line
