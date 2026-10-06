@@ -656,8 +656,6 @@ def main() -> None:
         """, unsafe_allow_html=True)
     st.markdown("---")
 
-    session = get_rembg_session()
-
     st.subheader("Wgraj zdjęcie")
     img_before_cropping = add_picture()
 
@@ -718,6 +716,7 @@ def main() -> None:
                 st.session_state.error = None
                 try:
                     with st.spinner("Trwa generowanie, proszę czekać...", show_time=True):
+                        session = get_rembg_session()
                         st.session_state.result = start_the_process(
                             image=image_file,
                             main_text=main_text,
