@@ -1,0 +1,21 @@
+.app-footer {
+    padding: 8px 12px;
+    margin-top: 1rem;
+    line-height: 1.2;
+}
+.footer-inner {
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+.footer-logo {
+    height: 40px;
+    order: 2;
+}
+.footer-text {
+    order: 1;
+    text-align: left;
+    font-size: 0.65rem;
+}
+.footer-text .small {
+    font-size: 0.55rem;
+}

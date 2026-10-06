@@ -1,0 +1,32 @@
+div[data-testid="stVerticalBlockBorderWrapper"] button {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 2px solid rgba(0,0,0,0.15);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: transform 0.08s ease-in-out;
+    padding: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] button:hover {
+    transform: scale(1.05);
+    border-color: rgba(0,0,0,0.4);
+}
+div[data-testid="stVerticalBlockBorderWrapper"] button p {
+    font-size: 0;
+}
+
+@media (max-width: 640px) {
+    div[data-testid="stHorizontalBlock"]:has([class*="st-key-${key_prefix}_tile"]) {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has([class*="st-key-${key_prefix}_tile"]) > div[data-testid="stColumn"],
+    div[data-testid="stHorizontalBlock"]:has([class*="st-key-${key_prefix}_tile"]) > div[data-testid="column"] {
+        width: calc((100% / ${columns}) - 8px) !important;
+        min-width: calc((100% / ${columns}) - 8px) !important;
+        flex: 1 1 auto !important;
+        padding: 0 !important;
+    }
+}
