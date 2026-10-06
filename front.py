@@ -76,7 +76,7 @@ def is_streamlit_cloud() -> bool:
 
 
 @st.cache_resource
-def get_rembg_session_future():
+def get_rembg_session():
     future = Future()
 
     def _init_and_warmup():
