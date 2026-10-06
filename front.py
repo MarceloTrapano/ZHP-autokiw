@@ -5,13 +5,12 @@ import os
 import shutil
 import subprocess
 import tempfile
-import rembg
 from enum import StrEnum
 from pathlib import Path
 
 import numpy as np
 import streamlit as st
-from PIL import Image, ImageDraw
+from PIL import Image
 from streamlit_cropper import st_cropper
 from streamlit_javascript import st_javascript
 
@@ -71,27 +70,6 @@ def is_streamlit_cloud() -> bool:
     return bool(os.environ.get("STREAMLIT_SHARING_MODE")) or bool(
         os.environ.get("STREAMLIT_SERVER_HEADLESS")
     ) or "streamlit.app" in (os.environ.get("HOSTNAME") or "")
-
-
-@st.cache_resource
-def get_rembg_session():
-    home_dir = os.path.expanduser("~")
-    dest_dir = os.path.join(home_dir, ".rembg", "models", "u2netp")
-    dest_path = os.path.join(dest_dir, "u2netp.onnx")
-
-    if not os.path.exists(dest_path):
-        logger.info("Copying u2netp.onnx model from repository to cache...")
-        os.makedirs(dest_dir, exist_ok=True)
-        shutil.copy("models/u2netp.onnx", dest_path)
-
-    logger.info("Initializing rembg session...")
-    session = rembg.new_session("u2netp")
-
-    dummy_img = Image.new("RGB", (64, 64), (200, 200, 200))
-    rembg.remove(dummy_img, session=session)
-
-    logger.info("Model loaded and ready!")
-    return session
 
 
 @st.cache_resource
@@ -578,7 +556,7 @@ def check(image_file: Image.Image) -> bool:
     return True
 
 
-def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, session) -> bytes:
+def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution) -> bytes:
     logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
                 "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
@@ -589,7 +567,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
         src = tmp / "input.png"
         image.convert("RGB").save(src)
 
-        builder = (AutoKiwBuilder(session)
+        builder = (AutoKiwBuilder()
                    .set_image_path(str(src))
                    .set_main_text(main_text)
                    .set_secondary_text(secondary_text)
@@ -619,7 +597,6 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
 
 
 def main() -> None:
-    session = get_rembg_session()
     st.markdown(
         '<h2 style="color: #000000;">Aplikacja do obróbki zdjęć zgodnie z katalogiem identyfikacji wizualnej ZHP</h2>',
         unsafe_allow_html=True
@@ -726,7 +703,6 @@ def main() -> None:
                             use_cutout=use_cutout,
                             resolution=resolution,
                             logo=logo,
-                            session=session,
                         )
                 except Exception as e:
                     logger.exception("Graphic generation failed.")
