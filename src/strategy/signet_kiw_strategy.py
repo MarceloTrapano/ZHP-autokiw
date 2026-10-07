@@ -179,15 +179,16 @@ class SignetKiwStrategy(IKiwStrategy):
                     fill="black",
                 )
             )
-            mask.add(
-                self.dwg.rect(
-                    insert=(TOP_ROHIS_RECT_POS[0],
-                            TOP_ROHIS_RECT_POS[1] - GAP),
-                    size=(TOP_ROHIS_RECT_SHAPE[0] + GAP,
-                          TOP_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
-                    fill="black",
+            if self.config.rohis:
+                mask.add(
+                    self.dwg.rect(
+                        insert=(TOP_ROHIS_RECT_POS[0],
+                                TOP_ROHIS_RECT_POS[1] - GAP),
+                        size=(TOP_ROHIS_RECT_SHAPE[0] + GAP,
+                              TOP_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
+                        fill="black",
+                    )
                 )
-            )
         elif self.config.main_text:
             mask.add(
                 self.dwg.rect(
@@ -198,25 +199,27 @@ class SignetKiwStrategy(IKiwStrategy):
                     fill="black",
                 )
             )
-            mask.add(
-                self.dwg.rect(
-                    insert=(TOP_ROHIS_RECT_POS[0],
-                            TOP_ROHIS_RECT_POS[1] - GAP),
-                    size=(TOP_ROHIS_RECT_SHAPE[0] + GAP,
-                          TOP_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
-                    fill="black",
+            if self.config.rohis:
+                mask.add(
+                    self.dwg.rect(
+                        insert=(TOP_ROHIS_RECT_POS[0],
+                                TOP_ROHIS_RECT_POS[1] - GAP),
+                        size=(TOP_ROHIS_RECT_SHAPE[0] + GAP,
+                              TOP_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
+                        fill="black",
+                    )
                 )
-            )
         else:
-            mask.add(
-                self.dwg.rect(
-                    insert=(self.config.canvas_size[0] - GAP - BOTTOM_ROHIS_RECT_SHAPE[0],
-                            self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET - GAP),
-                    size=(BOTTOM_ROHIS_RECT_SHAPE[0] + GAP,
-                          BOTTOM_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
-                    fill="black",
+            if self.config.rohis:
+                mask.add(
+                    self.dwg.rect(
+                        insert=(self.config.canvas_size[0] - GAP - BOTTOM_ROHIS_RECT_SHAPE[0],
+                                self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET - GAP),
+                        size=(BOTTOM_ROHIS_RECT_SHAPE[0] + GAP,
+                              BOTTOM_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
+                        fill="black",
+                    )
                 )
-            )
 
         logger.debug("Frame mask added to SVG definitions")
         return mask
