@@ -41,7 +41,7 @@ def lock_button():
     st.session_state.is_running = True
 
 
-def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color) -> bytes:
+def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color, additional_settings) -> bytes:
     logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
                 "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
@@ -52,10 +52,10 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
         src = tmp / "input.png"
         image.convert("RGB").save(src)
 
-        if accent_color == "Biały":
-            accent_color = "white"
-        else:
+        if accent_color == "Czarny":
             accent_color = "black"
+        else:
+            accent_color = "white"
 
         builder = (AutoKiwBuilder()
                    .set_image_path(str(src))
@@ -69,6 +69,8 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
                    .set_image_shape(resolution)
                    .set_strategy(SignetKiwStrategy())
                    )
+        if additional_settings == "ROHiS":
+            builder = builder.set_rohis(True)
 
         if logo is not None:
             logo_path = tmp / "logo.png"
@@ -146,8 +148,13 @@ def main() -> None:
 
         st.markdown("---")
 
-        st.subheader("Czy chcesz wyciąć ramkę?")
-        use_cutout = st.checkbox("Użyj SI do wycięcia ramki")
+        col1, col2 = st.columns(2, gap="xlarge")
+        with col1:
+            st.subheader("Czy chcesz wyciąć ramkę?")
+            use_cutout = st.checkbox("Użyj SI do wycięcia ramki")
+        with col2:
+            additional_settings = st.pills("Dodatkowe ustawienia", [
+                "Brak", "ROHiS"], default="Brak")
 
         st.markdown("---")
 
@@ -192,8 +199,9 @@ def main() -> None:
                             use_cutout=use_cutout,
                             resolution=resolution,
                             logo=logo,
-                            colorful_logo=logo_type == "Kolorowe",
+                            colorful_logo=not (logo_type == "Jednolite"),
                             accent_color=accent_color,
+                            additional_settings=additional_settings,
                         )
                 except Exception as e:
                     logger.exception("Graphic generation failed.")
