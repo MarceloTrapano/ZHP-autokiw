@@ -6,7 +6,7 @@ from PIL import Image
 from ui.styles import ASSETS_DIR
 from ui.settings import setup_system_fonts, setup_logging
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 def setup(session_id):
