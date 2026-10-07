@@ -49,7 +49,7 @@ def setup_logging(session) -> logging.Logger:
     handler = logging.StreamHandler()
     handler.setFormatter(EmojiFormatter(session))
 
-    for name in ("zhp_autokiw", "src"):
+    for name in ("zhp_autokiw", "src", "ui"):
         lg = logging.getLogger(name)
         lg.setLevel(numeric_level)
         lg.propagate = False

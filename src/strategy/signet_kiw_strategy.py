@@ -403,11 +403,6 @@ class SignetKiwStrategy(IKiwStrategy):
         self.top_layer.add(text)
 
     def generate(self):
-
-        self.dwg = svgwrite.Drawing(
-            filename=self.config.output_path, profile="full", size=self.config.canvas_size
-        )
-
         inkscape = Inkscape(self.dwg)
 
         logger.debug("Loading input image from %s", self.config.image_path)

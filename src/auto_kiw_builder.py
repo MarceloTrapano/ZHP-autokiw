@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def svg_to_jpg(svg_path: str, jpg_path: str, size: int = (1200, 1200), quality: int = 90, background=(255, 255, 255)):
+def svg_to_jpg(svg_path: str, jpg_path: str, size: tuple[int, int] = (1200, 1200), quality: int = 90, background=(255, 255, 255)):
     png_path = str(Path(jpg_path).with_suffix(".png"))
     logger.info("Exporting SVG to JPEG (size=%sx%s, quality=%d)",
                 size[0], size[1], quality)
@@ -62,17 +62,6 @@ def svg_to_jpg(svg_path: str, jpg_path: str, size: int = (1200, 1200), quality: 
     logger.info("JPEG written to %s", jpg_path)
 
 
-def _image_href(path) -> str:
-    with Image.open(path) as img:
-        img = img.convert("RGBA")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        data = base64.b64encode(buf.getvalue()).decode("ascii")
-    logger.debug("Encoded %s as data URI (%d KiB base64)",
-                 Path(path).name, len(data) // 1024)
-    return f"data:image/png;base64,{data}"
-
-
 @dataclass
 class AutoKiwConfig:
     canvas_size: tuple[int, int]
@@ -104,7 +93,6 @@ class AutoKiwBuilder:
         self.color = ZhpColor.green_base
         self.image_path = None
         self.use_ai_cutout = False
-        self.dwg = None
         self.accent_color = "white"
         self.logo_is_color = False
         self.rohis = False
@@ -115,14 +103,6 @@ class AutoKiwBuilder:
         self.output_path = str(self.work_dir / "out.svg")
 
         self.padding = 18
-        self.gap = 7
-        self.fontsize = 37
-        self.text_pad_main = 125
-        self.text_pad_secondary = 125
-        self.font_y_pad = 53
-
-        self.main_box_start = 0
-        self.secondary_box_start = 0
 
         logger.debug(
             "AutoKiwBuilder created (canvas=%s, work_dir=%s, session_provided=%s)",
@@ -164,7 +144,7 @@ class AutoKiwBuilder:
 
     def set_color(self, color: ZhpColor | str):
         self.color = color
-        logger.debug("Accent color set to %s", color)
+        logger.debug("Main color set to %s", color)
         return self
 
     def set_main_text(self, text: str):
@@ -213,10 +193,6 @@ class AutoKiwBuilder:
         )
         assert self.strategy is not None, "Strategy is not set"
 
-        self.dwg = svgwrite.Drawing(
-            filename=self.output_path, profile="full", size=self.canvas_size
-        )
-
         payload: AutoKiwConfig = AutoKiwConfig(
             canvas_size=self.canvas_size,
             main_text=self.main_text,
@@ -242,26 +218,3 @@ class AutoKiwBuilder:
     def close(self):
         logger.debug("Removing work dir %s", self.work_dir)
         shutil.rmtree(self.work_dir, ignore_errors=True)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-    )
-    from strategy.signet_kiw_strategy import SignetKiwStrategy
-    strategy = SignetKiwStrategy()
-    builder = (
-        AutoKiwBuilder()
-        .set_image_path("/home/kacper/ZHP-autokiw/assets/stock.jpg")
-        .set_image_shape((1080, 1350))
-        .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
-        .set_color("#d9ff7a")
-        .set_main_text("")
-        .set_secondary_text("")
-        .set_cutout(True)
-        .set_author("Kacper Dąbrowski")
-        .set_strategy(strategy)
-    )
-    builder.build()
-    svg_to_jpg(builder.output_path, "szrysz.jpg", size=(1080, 1350))

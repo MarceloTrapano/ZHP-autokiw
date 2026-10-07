@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageOps
 from streamlit_cropper import st_cropper
 
 from ui.styles import inject_css
@@ -48,10 +48,12 @@ def crop_picture(img_before_cropping, window_width):
         if aspect_type is None:
             aspect_type = "Facebook"
 
-    img_high_res = img_before_cropping
-
-    if max(img_high_res.size) > MAX_BASE_RES:
-        img_high_res.thumbnail((MAX_BASE_RES, MAX_BASE_RES), Image.LANCZOS)
+    if max(img_before_cropping.size) > MAX_BASE_RES:
+        img_high_res = ImageOps.contain(
+            img_before_cropping, (MAX_BASE_RES, MAX_BASE_RES), Image.LANCZOS
+        )
+    else:
+        img_high_res = img_before_cropping
 
     preview_max = int(window_width - PREVIEW_MOBILE_SIDE_PADDING) if (window_width and 0 <
                                                                       window_width < MOBILE_BREAKPOINT) else PREVIEW_DESKTOP_MAX_SIDE

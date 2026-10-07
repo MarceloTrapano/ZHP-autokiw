@@ -1,6 +1,7 @@
 import base64
 import io
 import logging
+import hashlib
 
 import streamlit as st
 from PIL import Image
@@ -61,40 +62,28 @@ def decode_image(key: str, payload: dict, output_format: str) -> Image.Image:
         raise
 
 
-def image_picker(
-    key: str,
-    label: str = "Wybierz zdjęcie",
-    max_side: int = 1920,
-    quality: float = 0.92,
-    output_format: str = "jpeg",
-) -> Image.Image | None:
+def image_picker(key, label="Wybierz zdjęcie", max_side=1920,
+                 quality=0.92, output_format="jpeg"):
     fmt = resolve_format(key, output_format)
+    result = _component(key=key, data={
+        "label": label, "maxSide": max_side,
+        "quality": quality, "format": fmt,
+    })
 
-    logger.debug(
-        "image_picker[%s]: rendering component (max_side=%d, quality=%.2f, format=%s)",
-        key, max_side, quality, fmt,
-    )
-    result = _component(
-        key=key,
-        data={
-            "label": label,
-            "maxSide": max_side,
-            "quality": quality,
-            "format": fmt,
-        },
-    )
-
+    cache_key = f"_image_picker_cache_{key}"
     payload = getattr(result, "image", None)
     if not payload:
-        logger.debug("image_picker[%s]: no image selected yet", key)
+        st.session_state.pop(cache_key, None)   # zwolnij pamięć
         return None
 
-    is_new = log_received_image(key, payload)
-    image = decode_image(key, payload, fmt)
+    digest = hashlib.blake2b(
+        payload["data"].encode("ascii"), digest_size=16
+    ).hexdigest()
+    cached = st.session_state.get(cache_key)
+    if cached and cached[0] == digest:
+        return cached[1]                        # bez dekodowania
 
-    if is_new:
-        logger.debug(
-            "image_picker[%s]: decoded image (size=%s, mode=%s)",
-            key, image.size, image.mode,
-        )
+    log_received_image(key, payload)
+    image = decode_image(key, payload, fmt)
+    st.session_state[cache_key] = (digest, image)
     return image

@@ -34,7 +34,7 @@ if "is_running" not in st.session_state:
 
 setup(st.session_state.session_id)
 
-logger = logging.getLogger()
+logger = logging.getLogger("zhp_autokiw.front")
 
 
 def lock_button():
@@ -43,9 +43,9 @@ def lock_button():
 
 def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color, padding, strategy_class, additional_settings) -> bytes:
     logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
-                "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
+                "main_text=%r, secondary_text=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
-                author, "tak" if logo is not None else "nie")
+                "exists" if logo is not None else "does not exist")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
