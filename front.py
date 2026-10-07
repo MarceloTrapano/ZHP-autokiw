@@ -7,7 +7,7 @@ import streamlit as st
 from streamlit_javascript import st_javascript
 
 from src import ZhpColor, AutoKiwBuilder
-from src.strategy import SignetKiwStrategy
+from src.strategy import SignetKiwStrategy, IdentifierKiwStrategy
 from src.auto_kiw_builder import svg_to_jpg
 from ui import (
     image_picker,
@@ -41,7 +41,7 @@ def lock_button():
     st.session_state.is_running = True
 
 
-def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color, additional_settings) -> bytes:
+def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color, strategy_class, additional_settings) -> bytes:
     logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
                 "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
@@ -57,6 +57,14 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
         else:
             accent_color = "white"
 
+        match strategy_class:
+            case "Sygnet":
+                strategy = SignetKiwStrategy()
+            case "Identyfikator":
+                strategy = IdentifierKiwStrategy()
+            case _:
+                raise ValueError("No strategy has been set")
+
         builder = (AutoKiwBuilder()
                    .set_image_path(str(src))
                    .set_main_text(main_text)
@@ -67,7 +75,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
                    .set_accent_color(accent_color)
                    .set_cutout(use_cutout)
                    .set_image_shape(resolution)
-                   .set_strategy(SignetKiwStrategy())
+                   .set_strategy(strategy)
                    )
         if additional_settings == "ROHiS":
             builder = builder.set_rohis(True)
@@ -106,10 +114,15 @@ def main() -> None:
 
     st.markdown("---")
 
-    st.subheader("Wgraj zdjęcie")
-    img_before_cropping = image_picker(key="main_picture")
+    col1, col2 = st.columns(2, gap="large")
+    with col1:
+        st.subheader("Wgraj zdjęcie")
+        img_before_cropping = image_picker(key="main_picture")
+    with col2:
+        strategy_class = st.segmented_control(
+            "Wybierz typ formatki", ["Sygnet", "Identyfikator"], default="Sygnet")
 
-    if img_before_cropping is not None:
+    if img_before_cropping is not None and strategy_class is not None:
         image_file, resolution = crop_picture(
             img_before_cropping, window_width)
 
@@ -169,7 +182,7 @@ def main() -> None:
             )
         with col2:
             logo_type = st.pills("Rodzaj loga", [
-                                 "Jednolite", "Kolorowe"], default="Jednolite", disabled=logo is None)
+                                 "Jednolite", "Kolorowe"], default="Jednolite", disabled=logo is None or strategy_class == "Identyfikator")
             accent_color = st.pills("Kolor tekstu", [
                 "Biały", "Czarny"], default="Biały")
 
@@ -201,6 +214,7 @@ def main() -> None:
                             logo=logo,
                             colorful_logo=not (logo_type == "Jednolite"),
                             accent_color=accent_color,
+                            strategy_class=strategy_class,
                             additional_settings=additional_settings,
                         )
                 except Exception as e:
