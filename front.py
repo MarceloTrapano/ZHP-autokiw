@@ -169,7 +169,7 @@ def main() -> None:
             )
         with col2:
             logo_type = st.pills("Rodzaj loga", [
-                                 "Jednolite", "Kolorowe"], default="Jednolite")
+                                 "Jednolite", "Kolorowe"], default="Jednolite", disabled=logo is None)
             accent_color = st.pills("Kolor tekstu", [
                 "Biały", "Czarny"], default="Biały")
 

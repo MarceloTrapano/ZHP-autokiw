@@ -43,7 +43,7 @@ def crop_picture(img_before_cropping, window_width):
         st.subheader("Przytnij zdjęcie")
     with c2:
         aspect_type = st.pills(
-            "Wybierz typ", ["Facebook", "Instagram", "Dowolny"], default="Facebook"
+            "Wybierz typ wycięcia", ["Facebook", "Instagram", "Dowolny"], default="Facebook"
         )
         if aspect_type is None:
             aspect_type = "Facebook"
