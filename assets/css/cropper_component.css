@@ -1,0 +1,68 @@
+.zhp-cropper {
+  --bw: 2px;
+  display: flex;
+  justify-content: center;
+}
+
+.zhp-cropper .stage {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  overflow: hidden;
+  contain: layout paint;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.zhp-cropper img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.zhp-cropper .dim,
+.zhp-cropper .box {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+}
+
+.zhp-cropper .dim {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.zhp-cropper .box {
+  border: var(--bw) solid #000000;
+  outline: 1px solid rgba(0, 0, 0, 0.55);
+  cursor: move;
+  touch-action: none;
+  will-change: transform, width, height;
+}
+
+.zhp-cropper .frame {
+  position: absolute;
+  left: calc(-1 * var(--bw));
+  top: calc(-1 * var(--bw));
+  width: calc(100% + 2 * var(--bw));
+  height: calc(100% + 2 * var(--bw));
+  overflow: visible;
+  pointer-events: none;
+}
+
+.zhp-cropper .handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  background: rgba(82, 82, 82, 0.5);
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  touch-action: none;
+}
+
+.zhp-cropper .nw { left: 0;  top: 0;    cursor: nwse-resize; border-width: 0 1px 1px 0; }
+.zhp-cropper .ne { right: 0; top: 0;    cursor: nesw-resize; border-width: 0 0 1px 1px; }
+.zhp-cropper .sw { left: 0;  bottom: 0; cursor: nesw-resize; border-width: 1px 1px 0 0; }
+.zhp-cropper .se { right: 0; bottom: 0; cursor: nwse-resize; border-width: 1px 0 0 1px; }
