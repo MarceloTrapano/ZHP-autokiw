@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Assets:
     BASE_DIR = Path(
         os.environ.get("AUTOKIW_ASSETS")
-        or Path(__file__).resolve().parent.parent / "assets"
+        or Path(__file__).resolve().parent.parent.parent / "assets"
     )
 
     WOSM_LOGO = BASE_DIR / "WOSM_logo.png"

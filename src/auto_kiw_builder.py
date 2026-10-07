@@ -86,7 +86,7 @@ class AutoKiwConfig:
     image_path: str
     logo_path: str | None
     use_ai_cutout: bool
-    rembg_session: BaseSession | None
+    rembg_session: "BaseSession"
     padding: int
 
 
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     strategy = SignetKiwStrategy()
     builder = (
         AutoKiwBuilder()
-        .set_image_path("/home/kacper/ZHP-autokiw/assets/target.jpg")
+        .set_image_path("/home/kacper/ZHP-autokiw/assets/stock.jpg")
         .set_image_shape((1080, 1350))
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
         .set_color("#d9ff7a")

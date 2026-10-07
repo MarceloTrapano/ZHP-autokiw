@@ -4,9 +4,9 @@ import svgwrite
 from svgwrite.extensions import Inkscape
 from PIL import Image, ImageFilter, ImageOps, ImageDraw
 
-from strategy.Ikiw_strategy import IKiwStrategy
-from auto_kiw_builder import AutoKiwConfig
-from strategy.common import text_width, image_href, Assets
+from src.strategy.Ikiw_strategy import IKiwStrategy
+from src.auto_kiw_builder import AutoKiwConfig
+from src.strategy.common import text_width, image_href, Assets
 
 
 logger = logging.getLogger(__name__)

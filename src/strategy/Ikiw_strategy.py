@@ -1,15 +1,9 @@
 import logging
-import io
-import os
-import base64
-import json
-from pathlib import Path
 from abc import ABC, abstractmethod
 
 import svgwrite
-from PIL import Image, ImageFilter, ImageOps, ImageDraw
 
-from auto_kiw_builder import AutoKiwConfig
+from src.auto_kiw_builder import AutoKiwConfig
 
 
 logger = logging.getLogger(__name__)
