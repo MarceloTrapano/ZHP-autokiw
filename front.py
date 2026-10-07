@@ -218,7 +218,7 @@ def main() -> None:
                             accent_color=accent_color,
                             strategy_class=strategy_class,
                             additional_settings=additional_settings,
-                            padding=padding
+                            padding=padding + 1
                         )
                 except Exception as e:
                     logger.exception("Graphic generation failed.")

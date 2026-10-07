@@ -131,8 +131,7 @@ class SignetKiwStrategy(IKiwStrategy):
             alpha_channel = cutout.split()[-1]
 
             filter_size = self.config.padding * 2 + 1
-            if self.config.padding == 0:
-                filter_size = 3
+
             dilated_alpha = alpha_channel.filter(
                 ImageFilter.MaxFilter(filter_size))
 
