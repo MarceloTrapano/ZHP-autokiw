@@ -1,20 +1,23 @@
-import svgwrite
-import tempfile
-from svgwrite.extensions import Inkscape
-from .zhp_color import ZhpColor
-from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
-from typing import Optional, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from rembg.sessions.base import BaseSession
 import base64
-import os
 import io
 import subprocess
 import shutil
-import json
 import logging
+import tempfile
+from pathlib import Path
+from typing import Optional, TYPE_CHECKING
+from dataclasses import dataclass
+
+import svgwrite
+from PIL import Image
+
+
+from .zhp_color import ZhpColor
+
+if TYPE_CHECKING:
+    from rembg.sessions.base import BaseSession
+    from .strategy.Ikiw_strategy import IKiwStrategy
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,34 +73,21 @@ def _image_href(path) -> str:
     return f"data:image/png;base64,{data}"
 
 
-class Assets:
-    BASE_DIR = Path(
-        os.environ.get("AUTOKIW_ASSETS")
-        or Path(__file__).resolve().parent.parent / "assets"
-    )
-
-    WOSM_LOGO = BASE_DIR / "WOSM_logo.png"
-    WAGGS_LOGO = BASE_DIR / "WAGGS_logo.png"
-    ZHP_LOGO = BASE_DIR / "zhp_logo.png"
-    WIDTHS = {f["name"]: {**f["uppercase"], " ": f["other"]["space"], "-": f["other"]["hyphen"]}
-              for f in json.load(open(BASE_DIR / "museo_sans_widths.json", encoding="utf-8"))["fonts"]}
-
-
-logger.debug("Assets loaded from %s (font width tables: %s)",
-             Assets.BASE_DIR, ", ".join(Assets.WIDTHS))
-
-FALLBACK_WIDTH = 25
-
-
-def text_width(text, font, size=37):
-    w = Assets.WIDTHS[font]
-    missing = {ch for ch in text.upper() if ch not in w}
-    if missing:
-        logger.debug(
-            "text_width: %d character(s) missing from the %r width table, using fallback width %d: %s",
-            len(missing), font, FALLBACK_WIDTH, "".join(sorted(missing)),
-        )
-    return sum(w.get(ch, FALLBACK_WIDTH) for ch in text.upper()) * size / 37
+@dataclass
+class AutoKiwConfig:
+    canvas_size: tuple[int, int]
+    main_text: str
+    secondary_text: str
+    author: str
+    color: str
+    person_mask_path: str
+    processed_image_path: str
+    output_path: str
+    image_path: str
+    logo_path: str | None
+    use_ai_cutout: bool
+    rembg_session: BaseSession | None
+    padding: int
 
 
 class AutoKiwBuilder:
@@ -112,7 +102,6 @@ class AutoKiwBuilder:
         self.image_path = None
         self.use_ai_cutout = False
         self.dwg = None
-        self.img = None
 
         self.work_dir = Path(tempfile.mkdtemp(prefix="autokiw_"))
         self.processed_image = self.work_dir / "processed.jpg"
@@ -151,19 +140,11 @@ class AutoKiwBuilder:
         logger.debug("Input image path set: %s", path)
         return self
 
-    def set_image(self, image: Image.Image):
-        self.img = image
-        logger.debug("Input image set from memory (size=%s, mode=%s)",
-                     getattr(image, "size", None), getattr(image, "mode", None))
-        return self
-
     def set_image_shape(self, shape: tuple[int, int]):
         if len(shape) != 2:
             raise ValueError("Invalid shape. Expected a tuple of 2 elements.")
-
         self.canvas_size = shape
         logger.debug("Canvas size set to %s", shape)
-
         return self
 
     def set_color(self, color: ZhpColor | str):
@@ -173,24 +154,12 @@ class AutoKiwBuilder:
 
     def set_main_text(self, text: str):
         self.main_text = text
-
-        font = "Museo Sans 100" if self.secondary_text else "Museo Sans 900"
-        pad = self.text_pad_secondary if self.secondary_text else self.text_pad_main
-        self.main_box_start = self.canvas_size[0] - (
-            text_width(text, font, size=self.fontsize) + pad
-        )
-        logger.debug("Main text set (%d chars, font=%r, box_start=%.1f)",
-                     len(text), font, self.main_box_start)
+        logger.debug("Main text set")
         return self
 
     def set_secondary_text(self, text: str):
         self.secondary_text = text
-        self.secondary_box_start = self.canvas_size[0] - (
-            text_width(text, "Museo Sans 900", self.fontsize) +
-            self.text_pad_main
-        )
-        logger.debug("Secondary text set (%d chars, box_start=%.1f)",
-                     len(text), self.secondary_box_start)
+        logger.debug("Secondary text set")
         return self
 
     def set_cutout(self, state: bool, padding: int = 18):
@@ -210,154 +179,10 @@ class AutoKiwBuilder:
         logger.debug("Author %s", "set" if author else "cleared")
         return self
 
-    def _prepare_mask(self):
-        assert self.dwg is not None, "dwg is not defined"
-        self.mask = self.dwg.mask(id="frame_mask")
-        self.mask.add(self.dwg.rect(
-            insert=(0, 0), size=self.canvas_size, fill="white"))
-
-        if self.img is None:
-            logger.debug("Loading input image from %s", self.image_path)
-            with Image.open(self.image_path) as img:
-                cropped_img = ImageOps.fit(
-                    img, self.canvas_size, centering=(0.5, 0.5))
-                cropped_img.save(self.processed_image, quality=95)
-        else:
-            logger.debug("Using in-memory input image")
-            cropped_img = ImageOps.fit(
-                self.img, self.canvas_size, centering=(0.5, 0.5))
-            cropped_img.save(self.processed_image, quality=95)
-        logger.debug("Image cropped to %s and saved to %s",
-                     self.canvas_size, self.processed_image)
-
-        if self.use_ai_cutout:
-            logger.info("AI cutout enabled, importing rembg")
-            try:
-                from rembg import remove
-            except ImportError as e:
-                logger.error(
-                    "rembg could not be imported, AI cutout is unavailable")
-                raise RuntimeError(
-                    "AI cutout requires rembg"
-                ) from e
-            boxes = [(0, 108.2 - self.gap, 352.8 +
-                      self.gap, 108.2 + 95.5 + self.gap)]
-            if self.secondary_text:
-                boxes.append(
-                    (
-                        self.secondary_box_start - self.gap,
-                        self.canvas_size[1] - 220 - self.gap,
-                        self.canvas_size[0],
-                        self.canvas_size[1] - 220 + 80 + self.gap,
-                    )
-                )
-                boxes.append(
-                    (self.main_box_start - self.gap, self.canvas_size[1] - 299 - self.gap,
-                     self.canvas_size[0], self.canvas_size[1] - 299 + 80 + self.gap)
-                )
-            elif self.main_text:
-                boxes.append(
-                    (self.main_box_start - self.gap, self.canvas_size[1] - 220 - self.gap,
-                     self.canvas_size[0], self.canvas_size[1] - 220 + 80 + self.gap)
-                )
-            logger.debug(
-                "Excluding %d box(es) from the cutout mask", len(boxes))
-
-            session = self._get_session()
-            logger.info("Running background removal on a %dx%d image",
-                        cropped_img.size[0], cropped_img.size[1])
-            cutout = remove(cropped_img, session=session)
-            logger.info("Background removal finished")
-
-            alpha_channel = cutout.split()[-1]
-
-            filter_size = self.padding * 2 + 1
-            dilated_alpha = alpha_channel.filter(
-                ImageFilter.MaxFilter(filter_size))
-
-            blurred_alpha = dilated_alpha.filter(
-                ImageFilter.GaussianBlur(radius=5))
-            binary_alpha = blurred_alpha.point(lambda p: 255 if p > 200 else 0)
-
-            inverted_mask = ImageOps.invert(binary_alpha)
-
-            if boxes:
-                draw = ImageDraw.Draw(inverted_mask)
-                for box in boxes:
-                    draw.rectangle(box, fill=0)
-
-            inverted_mask.save(self.person_mask)
-            logger.debug("Cutout mask saved to %s (padding=%d)",
-                         self.person_mask, self.padding)
-
-            self.mask.add(
-                self.dwg.image(
-                    _image_href(self.person_mask),
-                    insert=(0, 0),
-                    size=self.canvas_size,
-                )
-            )
-        else:
-            logger.debug("AI cutout disabled, skipping background removal")
-
-        if self.secondary_text:
-            self.mask.add(
-                self.dwg.rect(
-                    insert=(self.secondary_box_start -
-                            self.gap, self.canvas_size[1] - 220 - self.gap),
-                    size=(self.canvas_size[0] - self.secondary_box_start +
-                          self.gap, 80 + (self.gap * 2)),
-                    fill="black",
-                )
-            )
-            self.mask.add(
-                self.dwg.rect(
-                    insert=(self.main_box_start - self.gap,
-                            self.canvas_size[1] - 299 - self.gap),
-                    size=(self.canvas_size[0] - self.main_box_start +
-                          self.gap, 80 + (self.gap * 2)),
-                    fill="black",
-                )
-            )
-        elif self.main_text:
-            self.mask.add(
-                self.dwg.rect(
-                    insert=(self.main_box_start - self.gap,
-                            self.canvas_size[1] - 220 - self.gap),
-                    size=(self.canvas_size[0] - self.main_box_start +
-                          self.gap, 80 + (self.gap * 2)),
-                    fill="black",
-                )
-            )
-        self.dwg.defs.add(self.mask)
-        logger.debug("Frame mask added to SVG definitions")
-
-    def _add_frame(self,
-                   margin=67,
-                   stroke_width=15,
-                   color="white",
-                   stub_len=25.5,
-                   gap_len=127,
-                   ):
-        y_stub_end = margin + stub_len
-        y_gap_end = y_stub_end + gap_len
-
-        points = [
-            (margin, y_stub_end),
-            (margin, margin),
-            (self.canvas_size[0] - margin, margin),
-            (self.canvas_size[0] - margin, self.canvas_size[1] - margin),
-            (margin, self.canvas_size[1] - margin),
-            (margin, y_gap_end),
-        ]
-
-        return self.dwg.polyline(
-            points=points,
-            stroke=color,
-            stroke_width=stroke_width,
-            fill="none",
-            stroke_linecap="square",
-        )
+    def set_strategy(self, strategy: "IKiwStrategy"):
+        self.strategy = strategy
+        logger.debug("Strategy set to: %s", strategy)
+        return self
 
     def build(self):
         logger.info(
@@ -367,158 +192,30 @@ class AutoKiwBuilder:
             bool(self.logo_path), bool(self.main_text),
             bool(self.secondary_text), bool(self.author),
         )
+        assert self.strategy is not None, "Strategy is not set"
 
-        self.set_main_text(self.main_text)
-        if self.secondary_text:
-            self.set_secondary_text(self.secondary_text)
         self.dwg = svgwrite.Drawing(
             filename=self.output_path, profile="full", size=self.canvas_size
         )
-        inkscape = Inkscape(self.dwg)
-        self._prepare_mask()
 
-        image_layer = inkscape.layer(label="Image layer", locked=True)
-        self.dwg.add(image_layer)
-
-        image = self.dwg.image(
-            _image_href(self.processed_image),
-            insert=(0, 0),
-            size=self.canvas_size,
+        payload: AutoKiwConfig = AutoKiwConfig(
+            canvas_size=self.canvas_size,
+            main_text=self.main_text,
+            secondary_text=self.secondary_text,
+            author=self.author,
+            color=self.color,
+            person_mask_path=self.person_mask,
+            processed_image_path=self.processed_image,
+            output_path=self.output_path,
+            logo_path=self.logo_path,
+            image_path=self.image_path,
+            use_ai_cutout=self.use_ai_cutout,
+            rembg_session=self._get_session(),
+            padding=self.padding,
         )
-        image_layer.add(image)
 
-        top_layer = inkscape.layer(label="Top layer", locked=True)
-        self.dwg.add(top_layer)
-
-        frame = self._add_frame()
-        frame["mask"] = self.mask.get_funciri()
-        top_layer.add(frame)
-
-        if self.logo_path:
-            logger.debug("Adding custom logo from %s", self.logo_path)
-            rect = self.dwg.rect(
-                insert=(0, 108.2),
-                size=(352.8, 95.5),
-                fill=self.color,
-            )
-            top_layer.add(rect)
-            image = self.dwg.image(
-                _image_href(self.logo_path),
-                insert=(270, 124),
-                size=(65, 65),
-            )
-            top_layer.add(image)
-        else:
-            logger.debug("No custom logo, using the short logo bar")
-            rect = self.dwg.rect(
-                insert=(0, 108.2),
-                size=(300, 95.5),
-                fill=self.color,
-            )
-            top_layer.add(rect)
-
-        image = self.dwg.image(
-            _image_href(Assets.WAGGS_LOGO),
-            insert=(202, 123),
-            size=(50, 67),
-        )
-        top_layer.add(image)
-        image = self.dwg.image(
-            _image_href(Assets.WOSM_LOGO),
-            insert=(118, 124),
-            size=(65, 65),
-        )
-        top_layer.add(image)
-        image = self.dwg.image(
-            _image_href(Assets.ZHP_LOGO),
-            insert=(33, 124),
-            size=(65, 65),
-        )
-        top_layer.add(image)
-        logger.debug("Organization logos added")
-
-        if self.secondary_text:
-            logger.debug("Adding main text and subtitle boxes")
-            rect = self.dwg.rect(
-                insert=(self.secondary_box_start, self.canvas_size[1] - 220),
-                size=(self.canvas_size[0], 80),
-                fill=self.color,
-            )
-            top_layer.add(rect)
-
-            rect = self.dwg.rect(
-                insert=(self.main_box_start, self.canvas_size[1] - 299),
-                size=(self.canvas_size[0], 80),
-                fill=self.color,
-            )
-            top_layer.add(rect)
-
-            text = self.dwg.text(
-                self.secondary_text.upper(),
-                insert=(
-                    self.canvas_size[0] - 60, self.canvas_size[1] - 220 + self.font_y_pad),
-                font_family="Museo Sans 900",
-                font_size=self.fontsize,
-                fill="white",
-                text_anchor="end",
-            )
-            top_layer.add(text)
-
-            text = self.dwg.text(
-                self.main_text.upper(),
-                insert=(
-                    self.canvas_size[0] - 60, self.canvas_size[1] - 299 + self.font_y_pad),
-                font_family="Museo Sans 100",
-                font_size=self.fontsize,
-                fill="white",
-                text_anchor="end",
-            )
-            top_layer.add(text)
-
-        elif self.main_text:
-            logger.debug("Adding main text box")
-            rect = self.dwg.rect(
-                insert=(self.main_box_start, self.canvas_size[1] - 220),
-                size=(self.canvas_size[0], 80),
-                fill=self.color,
-            )
-            top_layer.add(rect)
-
-            text = self.dwg.text(
-                self.main_text.upper(),
-                insert=(
-                    self.canvas_size[0] - 60, self.canvas_size[1] - 220 + self.font_y_pad),
-                font_family="Museo Sans 900",
-                font_size=self.fontsize,
-                fill="white",
-                text_anchor="end",
-            )
-            top_layer.add(text)
-        else:
-            logger.debug("No title text provided, skipping text boxes")
-
-        if self.author:
-            logger.debug("Adding author credit")
-            x = 38
-            y = self.canvas_size[1] - 77
-            text = self.dwg.text(
-                "FOT. " + self.author.upper(),
-                insert=(x, y),
-                font_family="Museo Sans 100",
-                font_size=20,
-                fill="white",
-                opacity=0.8,
-            )
-            text.rotate(-90, center=(x, y))
-
-            top_layer.add(text)
-
-        self.dwg.save()
-
-        svg = self.dwg.tostring()
-        logger.info("Graphic built (SVG size: %d KiB, saved to %s)",
-                    len(svg) // 1024, self.output_path)
-        return svg
+        self.strategy.set_config(payload)
+        return self.strategy.generate()
 
     def close(self):
         logger.debug("Removing work dir %s", self.work_dir)
@@ -530,9 +227,11 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     )
-    graphic = (
+    from strategy.signet_kiw_strategy import SignetKiwStrategy
+    strategy = SignetKiwStrategy()
+    builder = (
         AutoKiwBuilder()
-        .set_image("/home/kacper/ZHP-autokiw/assets/target.jpg")
+        .set_image_path("/home/kacper/ZHP-autokiw/assets/target.jpg")
         .set_image_shape((1080, 1350))
         .set_logo_path("/home/kacper/ZHP-autokiw/assets/logo.png")
         .set_color("#d9ff7a")
@@ -540,6 +239,7 @@ if __name__ == "__main__":
         .set_secondary_text("")
         .set_cutout(True)
         .set_author("Kacper Dąbrowski")
-        .build()
+        .set_strategy(strategy)
     )
-    svg_to_jpg("test.svg", "szrysz.jpg", size=(1080, 1350))
+    builder.build()
+    svg_to_jpg(builder.output_path, "szrysz.jpg", size=(1080, 1350))
