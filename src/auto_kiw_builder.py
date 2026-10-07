@@ -178,7 +178,7 @@ class AutoKiwBuilder:
         logger.debug("Secondary text set")
         return self
 
-    def set_cutout(self, state: bool, padding: int = 18):
+    def set_cutout(self, state: bool, padding: int = 0):
         self.use_ai_cutout = state
         self.padding = padding
         logger.debug("AI cutout %s (padding=%d)",
