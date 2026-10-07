@@ -130,21 +130,21 @@ class SignetKiwStrategy(IKiwStrategy):
 
             alpha_channel = cutout.split()[-1]
 
-            filter_size = self.config.padding * 2 + 1
-            dilated_alpha = alpha_channel.filter(
-                ImageFilter.MaxFilter(filter_size))
+            # filter_size = self.config.padding * 2 + 1
+            # dilated_alpha = alpha_channel.filter(
+            #    ImageFilter.MaxFilter(filter_size))
 
-            blurred_alpha = dilated_alpha.filter(
-                ImageFilter.GaussianBlur(radius=5))
-            binary_alpha = blurred_alpha.point(
-                lambda p: 255 if p > ALPHA_THRESHOLD else 0)
+            # blurred_alpha = dilated_alpha.filter(
+            #    ImageFilter.GaussianBlur(radius=5))
+            # binary_alpha = blurred_alpha.point(
+            #    lambda p: 255 if p > ALPHA_THRESHOLD else 0)
 
-            inverted_mask = ImageOps.invert(binary_alpha)
+            # inverted_mask = ImageOps.invert(binary_alpha)
 
-            if boxes:
-                draw = ImageDraw.Draw(inverted_mask)
-                for box in boxes:
-                    draw.rectangle(box, fill=0)
+            # if boxes:
+            #    draw = ImageDraw.Draw(inverted_mask)
+            #    for box in boxes:
+            #        draw.rectangle(box, fill=0)
 
             inverted_mask.save(self.config.person_mask_path)
             logger.debug("Cutout mask saved to %s (padding=%d)",
