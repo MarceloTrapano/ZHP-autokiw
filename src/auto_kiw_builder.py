@@ -135,8 +135,8 @@ class AutoKiwBuilder:
                         "(the model may need to be downloaded on first use)")
             from rembg import new_session
             self._session = new_session(
-                "u2netp", providers=["CPUExecutionProvider"])
-            logger.info("rembg session created (model=u2netp)")
+                "u2net_human_seg", providers=["CPUExecutionProvider"])
+            logger.info("rembg session created (model=u2net_human_seg)")
         else:
             logger.debug("Reusing existing rembg session")
         return self._session
@@ -177,7 +177,7 @@ class AutoKiwBuilder:
         logger.debug("Secondary text set")
         return self
 
-    def set_cutout(self, state: bool, padding: int = 18):
+    def set_cutout(self, state: bool, padding: int = 0):
         self.use_ai_cutout = state
         self.padding = padding
         logger.debug("AI cutout %s (padding=%d)",

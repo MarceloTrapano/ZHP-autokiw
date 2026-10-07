@@ -41,7 +41,7 @@ def lock_button():
     st.session_state.is_running = True
 
 
-def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color, strategy_class, additional_settings) -> bytes:
+def start_the_process(image, logo, main_text, secondary_text, author, color, use_cutout, resolution, colorful_logo, accent_color, padding, strategy_class, additional_settings) -> bytes:
     logger.info("Generating graphic: resolution=%s, color=%s, cutout=%s, "
                 "main_text=%r, secondary_text=%r, author=%r, logo=%s.",
                 resolution, color, use_cutout, main_text, secondary_text,
@@ -73,7 +73,7 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
                    .set_color(color)
                    .set_logo_is_color(colorful_logo)
                    .set_accent_color(accent_color)
-                   .set_cutout(use_cutout)
+                   .set_cutout(use_cutout, padding=padding)
                    .set_image_shape(resolution)
                    .set_strategy(strategy)
                    )
@@ -168,6 +168,8 @@ def main() -> None:
         with col2:
             additional_settings = st.pills("Dodatkowe ustawienia", [
                 "Brak", "ROHiS"], default="Brak")
+            padding = st.number_input(
+                "Ustaw grubość wycinania", on_change=None, disabled=not use_cutout, max_value=50, min_value=0, value=18, step=1)
 
         st.markdown("---")
 
@@ -216,6 +218,7 @@ def main() -> None:
                             accent_color=accent_color,
                             strategy_class=strategy_class,
                             additional_settings=additional_settings,
+                            padding=padding
                         )
                 except Exception as e:
                     logger.exception("Graphic generation failed.")
