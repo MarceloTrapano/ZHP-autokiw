@@ -11,29 +11,71 @@ from src.strategy.common import text_width, image_href, Assets
 
 logger = logging.getLogger(__name__)
 
+# Main config
+GAP = 8
+FONTSIZE = 37
+MAIN_TEXT_PAD = 125
+SECONDARY_TEXT_PAD = 125
+FONT_Y_PAD = 53
+
+# Author config
+AUTHOR_X_POS = 38
+AUTHOR_Y_OFFSET = 77
+AUTHOR_FONTSIZE = 20
+AUTHOR_OPACITY = 0.8
+AUTHOR_FONT = "Museo Sans 100"
+AUTHOR_ROTATION = -90
+
+# Logo rect config
+LOGO_RECT_SHAPE_SHORT = (300, 95.5)
+LOGO_RECT_SHAPE_LONG = (352.8, 95.5)
+LOGO_RECT_POS = (0, 108.2)
+CUSTOM_LOGO_POS = (270, 124)
+CUSTOM_LOGO_SHAPE = (65, 65)
+WAGGGS_LOGO_POS = (202, 123)
+WAGGGS_LOGO_SHAPE = (50, 67)
+WOSM_LOGO_POS = (118, 124)
+WOSM_LOGO_SHAPE = (65, 65)
+ZHP_LOGO_POS = (33, 124)
+ZHP_LOGO_SHAPE = (65, 65)
+
+TOP_ROHIS_RECT_POS = (0, 213)
+TOP_ROHIS_RECT_SHAPE = (440, 80)
+BOTTOM_ROHIS_RECT_SHAPE = (462, 80)
+BOTTOM_ROHIS_RECT_Y_OFFSET = 140.2
+TOP_ROHIS_POS = (44.5, 229)
+BOTTOM_ROHIS_Y_OFFSET = 204.1
+BOTTOM_ROHIS_X_OFFSET = 415.5
+ROHIS_SHAPE = (354, 45)
+
+# Text rects config
+BOTTOM_RECT_Y_OFFSET = 220
+TOP_RECT_Y_OFFSET = 299
+TEXT_RECT_HEIGHT = 80
+TEXT_X_OFFSET = 60
+FAT_FONT = "Museo Sans 900"
+SLIM_FONT = "Museo Sans 100"
+
+# Mask config
+ALPHA_THRESHOLD = 200
+
 
 class SignetKiwStrategy(IKiwStrategy):
     def __init__(self):
         self.config: AutoKiwConfig = None
 
-        self.gap = 7
-        self.fontsize = 37
-        self.text_pad_main = 125
-        self.text_pad_secondary = 125
-        self.font_y_pad = 53
-
         self.main_box_start = 0
         self.secondary_box_start = 0
 
     def _setup(self):
-        font = "Museo Sans 100" if self.config.secondary_text else "Museo Sans 900"
-        pad = self.text_pad_secondary if self.config.secondary_text else self.text_pad_main
+        font = SLIM_FONT if self.config.secondary_text else FAT_FONT
+        pad = SECONDARY_TEXT_PAD if self.config.secondary_text else MAIN_TEXT_PAD
         self.main_box_start = self.config.canvas_size[0] - (
-            text_width(self.config.main_text, font, size=self.fontsize) + pad
+            text_width(self.config.main_text, font, size=FONTSIZE) + pad
         )
         self.secondary_box_start = self.config.canvas_size[0] - (
-            text_width(self.config.secondary_text, "Museo Sans 900", self.fontsize) +
-            self.text_pad_main
+            text_width(self.config.secondary_text, FAT_FONT, FONTSIZE) +
+            MAIN_TEXT_PAD
         )
 
     def _prepare_mask(self):
@@ -57,25 +99,26 @@ class SignetKiwStrategy(IKiwStrategy):
                 raise RuntimeError(
                     "AI cutout requires rembg"
                 ) from e
-            boxes = [(0, 108.2 - self.gap, 352.8 +
-                      self.gap, 108.2 + 95.5 + self.gap)]
+            boxes = [(LOGO_RECT_POS[0], LOGO_RECT_POS[1] - GAP,
+                      LOGO_RECT_POS[0] + LOGO_RECT_SHAPE_LONG[0] + GAP, LOGO_RECT_POS[1] + LOGO_RECT_SHAPE_LONG[1] + GAP)]
             if self.config.secondary_text:
                 boxes.append(
                     (
-                        self.secondary_box_start - self.gap,
-                        self.config.canvas_size[1] - 220 - self.gap,
-                        self.config.canvas_size[0],
-                        self.config.canvas_size[1] - 220 + 80 + self.gap,
+                        self.secondary_box_start -
+                        GAP, self.config.canvas_size[1] -
+                        BOTTOM_RECT_Y_OFFSET - GAP,
+                        self.config.canvas_size[0], self.config.canvas_size[1] -
+                        BOTTOM_RECT_Y_OFFSET + TEXT_RECT_HEIGHT + GAP,
                     )
                 )
                 boxes.append(
-                    (self.main_box_start - self.gap, self.config.canvas_size[1] - 299 - self.gap,
-                     self.config.canvas_size[0], self.config.canvas_size[1] - 299 + 80 + self.gap)
+                    (self.main_box_start - GAP, self.config.canvas_size[1] - TOP_RECT_Y_OFFSET - GAP,
+                     self.config.canvas_size[0], self.config.canvas_size[1] - TOP_RECT_Y_OFFSET + TEXT_RECT_HEIGHT + GAP)
                 )
             elif self.config.main_text:
                 boxes.append(
-                    (self.main_box_start - self.gap, self.config.canvas_size[1] - 220 - self.gap,
-                     self.config.canvas_size[0], self.config.canvas_size[1] - 220 + 80 + self.gap)
+                    (self.main_box_start - GAP, self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET - GAP,
+                     self.config.canvas_size[0], self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET + TEXT_RECT_HEIGHT + GAP)
                 )
             logger.debug(
                 "Excluding %d box(es) from the cutout mask", len(boxes))
@@ -93,7 +136,8 @@ class SignetKiwStrategy(IKiwStrategy):
 
             blurred_alpha = dilated_alpha.filter(
                 ImageFilter.GaussianBlur(radius=5))
-            binary_alpha = blurred_alpha.point(lambda p: 255 if p > 200 else 0)
+            binary_alpha = blurred_alpha.point(
+                lambda p: 255 if p > ALPHA_THRESHOLD else 0)
 
             inverted_mask = ImageOps.invert(binary_alpha)
 
@@ -120,28 +164,56 @@ class SignetKiwStrategy(IKiwStrategy):
             mask.add(
                 self.dwg.rect(
                     insert=(self.secondary_box_start -
-                            self.gap, self.config.canvas_size[1] - 220 - self.gap),
+                            GAP, self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET - GAP),
                     size=(self.config.canvas_size[0] - self.secondary_box_start +
-                          self.gap, 80 + (self.gap * 2)),
+                          GAP, TEXT_RECT_HEIGHT + (GAP * 2)),
                     fill="black",
                 )
             )
             mask.add(
                 self.dwg.rect(
-                    insert=(self.main_box_start - self.gap,
-                            self.config.canvas_size[1] - 299 - self.gap),
+                    insert=(self.main_box_start - GAP,
+                            self.config.canvas_size[1] - TOP_RECT_Y_OFFSET - GAP),
                     size=(self.config.canvas_size[0] - self.main_box_start +
-                          self.gap, 80 + (self.gap * 2)),
+                          GAP, TEXT_RECT_HEIGHT + (GAP * 2)),
+                    fill="black",
+                )
+            )
+            mask.add(
+                self.dwg.rect(
+                    insert=(TOP_ROHIS_RECT_POS[0],
+                            TOP_ROHIS_RECT_POS[1] - GAP),
+                    size=(TOP_ROHIS_RECT_SHAPE[0] + GAP,
+                          TOP_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
                     fill="black",
                 )
             )
         elif self.config.main_text:
             mask.add(
                 self.dwg.rect(
-                    insert=(self.main_box_start - self.gap,
-                            self.config.canvas_size[1] - 220 - self.gap),
+                    insert=(self.main_box_start - GAP,
+                            self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET - GAP),
                     size=(self.config.canvas_size[0] - self.main_box_start +
-                          self.gap, 80 + (self.gap * 2)),
+                          GAP, TEXT_RECT_HEIGHT + (GAP * 2)),
+                    fill="black",
+                )
+            )
+            mask.add(
+                self.dwg.rect(
+                    insert=(TOP_ROHIS_RECT_POS[0],
+                            TOP_ROHIS_RECT_POS[1] - GAP),
+                    size=(TOP_ROHIS_RECT_SHAPE[0] + GAP,
+                          TOP_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
+                    fill="black",
+                )
+            )
+        else:
+            mask.add(
+                self.dwg.rect(
+                    insert=(self.config.canvas_size[0] - GAP - BOTTOM_ROHIS_RECT_SHAPE[0],
+                            self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET - GAP),
+                    size=(BOTTOM_ROHIS_RECT_SHAPE[0] + GAP,
+                          BOTTOM_ROHIS_RECT_SHAPE[1] + (GAP * 2)),
                     fill="black",
                 )
             )
@@ -149,63 +221,118 @@ class SignetKiwStrategy(IKiwStrategy):
         logger.debug("Frame mask added to SVG definitions")
         return mask
 
-    def _build_top_layer(self):
+    def _build_rohis_rect(self):
+        recolor_filter = self.dwg.defs.add(
+            self.dwg.filter(id="recolor_graphics"))
+        recolor_filter.feFlood(
+            flood_color=self.config.accent_color, result="flood")
+        recolor_filter.feComposite(
+            in_="flood", in2="SourceAlpha", operator="in")
+
+        if self.config.main_text or self.config.secondary_text:
+            logger.debug("Adding top ROHiS box")
+            rect = self.dwg.rect(
+                insert=TOP_ROHIS_RECT_POS,
+                size=TOP_ROHIS_RECT_SHAPE,
+                fill=self.config.color,
+            )
+            self.top_layer.add(rect)
+            image = self.dwg.image(
+                image_href(Assets.ROHIS_PATH),
+                insert=TOP_ROHIS_POS,
+                size=ROHIS_SHAPE,
+            )
+            image['filter'] = 'url(#recolor_graphics)'
+            self.top_layer.add(image)
+        else:
+            logger.debug("Adding bottom ROHiS box")
+            rect = self.dwg.rect(
+                insert=(self.config.canvas_size[0] - BOTTOM_ROHIS_RECT_SHAPE[0],
+                        self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET),
+                size=BOTTOM_ROHIS_RECT_SHAPE,
+                fill=self.config.color,
+            )
+            self.top_layer.add(rect)
+            image = self.dwg.image(
+                image_href(Assets.ROHIS_PATH),
+                insert=(self.config.canvas_size[0] - BOTTOM_ROHIS_X_OFFSET,
+                        self.config.canvas_size[1] - BOTTOM_ROHIS_Y_OFFSET),
+                size=ROHIS_SHAPE,
+            )
+            image['filter'] = 'url(#recolor_graphics)'
+            self.top_layer.add(image)
+
+    def _build_logo_rect(self):
+        recolor_filter = self.dwg.defs.add(
+            self.dwg.filter(id="recolor_graphics"))
+        recolor_filter.feFlood(
+            flood_color=self.config.accent_color, result="flood")
+        recolor_filter.feComposite(
+            in_="flood", in2="SourceAlpha", operator="in")
+
         if self.config.logo_path:
             logger.debug("Adding custom logo from %s", self.config.logo_path)
             rect = self.dwg.rect(
-                insert=(0, 108.2),
-                size=(352.8, 95.5),
+                insert=LOGO_RECT_POS,
+                size=LOGO_RECT_SHAPE_LONG,
                 fill=self.config.color,
             )
             self.top_layer.add(rect)
             image = self.dwg.image(
                 image_href(self.config.logo_path),
-                insert=(270, 124),
-                size=(65, 65),
+                insert=CUSTOM_LOGO_POS,
+                size=CUSTOM_LOGO_SHAPE,
             )
+            if not self.config.logo_is_color:
+                image['filter'] = 'url(#recolor_graphics)'
             self.top_layer.add(image)
         else:
             logger.debug("No custom logo, using the short logo bar")
             rect = self.dwg.rect(
-                insert=(0, 108.2),
-                size=(300, 95.5),
+                insert=LOGO_RECT_POS,
+                size=LOGO_RECT_SHAPE_SHORT,
                 fill=self.config.color,
             )
             self.top_layer.add(rect)
 
         image = self.dwg.image(
             image_href(Assets.WAGGS_LOGO),
-            insert=(202, 123),
-            size=(50, 67),
+            insert=WAGGGS_LOGO_POS,
+            size=WAGGGS_LOGO_SHAPE,
         )
+        image['filter'] = 'url(#recolor_graphics)'
         self.top_layer.add(image)
         image = self.dwg.image(
             image_href(Assets.WOSM_LOGO),
-            insert=(118, 124),
-            size=(65, 65),
+            insert=WOSM_LOGO_POS,
+            size=WOSM_LOGO_SHAPE,
         )
+        image['filter'] = 'url(#recolor_graphics)'
         self.top_layer.add(image)
         image = self.dwg.image(
             image_href(Assets.ZHP_LOGO),
-            insert=(33, 124),
-            size=(65, 65),
+            insert=ZHP_LOGO_POS,
+            size=ZHP_LOGO_SHAPE,
         )
+        image['filter'] = 'url(#recolor_graphics)'
         self.top_layer.add(image)
         logger.debug("Organization logos added")
 
+    def _build_text_rect(self):
         if self.config.secondary_text:
             logger.debug("Adding main text and subtitle boxes")
             rect = self.dwg.rect(
                 insert=(self.secondary_box_start,
-                        self.config.canvas_size[1] - 220),
-                size=(self.config.canvas_size[0], 80),
+                        self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET),
+                size=(self.config.canvas_size[0], TEXT_RECT_HEIGHT),
                 fill=self.config.color,
             )
             self.top_layer.add(rect)
 
             rect = self.dwg.rect(
-                insert=(self.main_box_start, self.config.canvas_size[1] - 299),
-                size=(self.config.canvas_size[0], 80),
+                insert=(self.main_box_start,
+                        self.config.canvas_size[1] - TOP_RECT_Y_OFFSET),
+                size=(self.config.canvas_size[0], TEXT_RECT_HEIGHT),
                 fill=self.config.color,
             )
             self.top_layer.add(rect)
@@ -213,10 +340,10 @@ class SignetKiwStrategy(IKiwStrategy):
             text = self.dwg.text(
                 self.config.secondary_text.upper(),
                 insert=(
-                    self.config.canvas_size[0] - 60, self.config.canvas_size[1] - 220 + self.font_y_pad),
-                font_family="Museo Sans 900",
-                font_size=self.fontsize,
-                fill="white",
+                    self.config.canvas_size[0] - TEXT_X_OFFSET, self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET + FONT_Y_PAD),
+                font_family=FAT_FONT,
+                font_size=FONTSIZE,
+                fill=self.config.accent_color,
                 text_anchor="end",
             )
             self.top_layer.add(text)
@@ -224,10 +351,10 @@ class SignetKiwStrategy(IKiwStrategy):
             text = self.dwg.text(
                 self.config.main_text.upper(),
                 insert=(
-                    self.config.canvas_size[0] - 60, self.config.canvas_size[1] - 299 + self.font_y_pad),
-                font_family="Museo Sans 100",
-                font_size=self.fontsize,
-                fill="white",
+                    self.config.canvas_size[0] - TEXT_X_OFFSET, self.config.canvas_size[1] - TOP_RECT_Y_OFFSET + FONT_Y_PAD),
+                font_family=SLIM_FONT,
+                font_size=FONTSIZE,
+                fill=self.config.accent_color,
                 text_anchor="end",
             )
             self.top_layer.add(text)
@@ -235,8 +362,9 @@ class SignetKiwStrategy(IKiwStrategy):
         elif self.config.main_text:
             logger.debug("Adding main text box")
             rect = self.dwg.rect(
-                insert=(self.main_box_start, self.config.canvas_size[1] - 220),
-                size=(self.config.canvas_size[0], 80),
+                insert=(self.main_box_start,
+                        self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET),
+                size=(self.config.canvas_size[0], TEXT_RECT_HEIGHT),
                 fill=self.config.color,
             )
             self.top_layer.add(rect)
@@ -244,31 +372,31 @@ class SignetKiwStrategy(IKiwStrategy):
             text = self.dwg.text(
                 self.config.main_text.upper(),
                 insert=(
-                    self.config.canvas_size[0] - 60, self.config.canvas_size[1] - 220 + self.font_y_pad),
-                font_family="Museo Sans 900",
-                font_size=self.fontsize,
-                fill="white",
+                    self.config.canvas_size[0] - TEXT_X_OFFSET, self.config.canvas_size[1] - BOTTOM_RECT_Y_OFFSET + FONT_Y_PAD),
+                font_family=FAT_FONT,
+                font_size=FONTSIZE,
+                fill=self.config.accent_color,
                 text_anchor="end",
             )
             self.top_layer.add(text)
         else:
             logger.debug("No title text provided, skipping text boxes")
 
-        if self.config.author:
-            logger.debug("Adding author credit")
-            x = 38
-            y = self.config.canvas_size[1] - 77
-            text = self.dwg.text(
-                "FOT. " + self.config.author.upper(),
-                insert=(x, y),
-                font_family="Museo Sans 100",
-                font_size=20,
-                fill="white",
-                opacity=0.8,
-            )
-            text.rotate(-90, center=(x, y))
+    def _build_author_space(self):
+        logger.debug("Adding author credit")
+        x = AUTHOR_X_POS
+        y = self.config.canvas_size[1] - AUTHOR_Y_OFFSET
+        text = self.dwg.text(
+            "FOT. " + self.config.author.upper(),
+            insert=(x, y),
+            font_family=AUTHOR_FONT,
+            font_size=AUTHOR_FONTSIZE,
+            fill="white",
+            opacity=AUTHOR_OPACITY,
+        )
+        text.rotate(AUTHOR_ROTATION, center=(x, y))
 
-            self.top_layer.add(text)
+        self.top_layer.add(text)
 
     def generate(self):
 
@@ -301,7 +429,15 @@ class SignetKiwStrategy(IKiwStrategy):
         frame["mask"] = mask.get_funciri()
         self.top_layer.add(frame)
 
-        self._build_top_layer()
+        self._build_logo_rect()
+
+        self._build_text_rect()
+
+        if self.config.author:
+            self._build_author_space()
+
+        if self.config.rohis:
+            self._build_rohis_rect()
 
         self.dwg.save()
 

@@ -88,6 +88,9 @@ class AutoKiwConfig:
     use_ai_cutout: bool
     rembg_session: "BaseSession"
     padding: int
+    accent_color: str
+    logo_is_color: bool
+    rohis: bool
 
 
 class AutoKiwBuilder:
@@ -102,6 +105,9 @@ class AutoKiwBuilder:
         self.image_path = None
         self.use_ai_cutout = False
         self.dwg = None
+        self.accent_color = "white"
+        self.logo_is_color = False
+        self.rohis = True
 
         self.work_dir = Path(tempfile.mkdtemp(prefix="autokiw_"))
         self.processed_image = self.work_dir / "processed.jpg"
@@ -140,6 +146,15 @@ class AutoKiwBuilder:
         logger.debug("Input image path set: %s", path)
         return self
 
+    def set_accent_color(self, color: str):
+        self.accent_color = color
+        logger.debug("Changed accent color to: %s", color)
+        return self
+
+    def set_logo_is_color(self, state: bool):
+        self.logo_is_color = state
+        return self
+
     def set_image_shape(self, shape: tuple[int, int]):
         if len(shape) != 2:
             raise ValueError("Invalid shape. Expected a tuple of 2 elements.")
@@ -172,6 +187,10 @@ class AutoKiwBuilder:
     def set_logo_path(self, path: str):
         self.logo_path = path
         logger.debug("Custom logo path set: %s", path)
+        return self
+
+    def set_rohis(self, state: bool):
+        self.rohis = state
         return self
 
     def set_author(self, author: str):
@@ -212,6 +231,9 @@ class AutoKiwBuilder:
             use_ai_cutout=self.use_ai_cutout,
             rembg_session=self._get_session(),
             padding=self.padding,
+            accent_color=self.accent_color,
+            logo_is_color=self.logo_is_color,
+            rohis=self.rohis,
         )
 
         self.strategy.set_config(payload)

@@ -22,6 +22,7 @@ class Assets:
     WOSM_LOGO = BASE_DIR / "WOSM_logo.png"
     WAGGS_LOGO = BASE_DIR / "WAGGS_logo.png"
     ZHP_LOGO = BASE_DIR / "zhp_logo.png"
+    ROHIS_PATH = BASE_DIR / "ROHIS_LOGA.png"
     WIDTHS = {f["name"]: {**f["uppercase"], " ": f["other"]["space"], "-": f["other"]["hyphen"]}
               for f in json.load(open(BASE_DIR / "museo_sans_widths.json", encoding="utf-8"))["fonts"]}
 
