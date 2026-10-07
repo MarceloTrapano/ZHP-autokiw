@@ -60,7 +60,8 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
                    .set_color(color)
                    .set_cutout(use_cutout)
                    .set_image_shape(resolution)
-                   .set_strategy(SignetKiwStrategy()))
+                   .set_strategy(SignetKiwStrategy())
+                   )
 
         if logo is not None:
             logo_path = tmp / "logo.png"

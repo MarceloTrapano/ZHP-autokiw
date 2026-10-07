@@ -107,7 +107,7 @@ class AutoKiwBuilder:
         self.dwg = None
         self.accent_color = "white"
         self.logo_is_color = False
-        self.rohis = True
+        self.rohis = False
 
         self.work_dir = Path(tempfile.mkdtemp(prefix="autokiw_"))
         self.processed_image = self.work_dir / "processed.jpg"
