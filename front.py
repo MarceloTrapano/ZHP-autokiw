@@ -7,6 +7,7 @@ import streamlit as st
 from streamlit_javascript import st_javascript
 
 from src import ZhpColor, AutoKiwBuilder
+from src.strategy import SignetKiwStrategy
 from src.auto_kiw_builder import svg_to_jpg
 from ui import (
     image_picker,
@@ -58,7 +59,9 @@ def start_the_process(image, logo, main_text, secondary_text, author, color, use
                    .set_author(author)
                    .set_color(color)
                    .set_cutout(use_cutout)
-                   .set_image_shape(resolution))
+                   .set_image_shape(resolution)
+                   .set_strategy(SignetKiwStrategy())
+                   )
 
         if logo is not None:
             logo_path = tmp / "logo.png"
