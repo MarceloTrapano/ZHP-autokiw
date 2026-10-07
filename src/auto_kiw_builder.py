@@ -135,7 +135,8 @@ class AutoKiwBuilder:
                         "(the model may need to be downloaded on first use)")
             from rembg import new_session
             self._session = new_session(
-                "silueta", providers=["CPUExecutionProvider"])  # u2netp : base
+                # u2netp : base, silueta : dziaa,
+                "u2net", providers=["CPUExecutionProvider"])
             logger.info("rembg session created (model=u2netp)")
         else:
             logger.debug("Reusing existing rembg session")
